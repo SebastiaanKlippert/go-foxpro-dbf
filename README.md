@@ -1,6 +1,6 @@
 # go-foxpro-dbf
 
-[![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](http://http://godoc.org/github.com/SebastiaanKlippert/go-foxpro-dbf)
+[![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](http://godoc.org/github.com/SebastiaanKlippert/go-foxpro-dbf)
 [![Build Status](https://travis-ci.org/SebastiaanKlippert/go-foxpro-dbf.svg?branch=master)](https://travis-ci.org/SebastiaanKlippert/go-foxpro-dbf)
 
 
