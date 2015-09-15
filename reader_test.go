@@ -5,8 +5,7 @@ import "testing"
 //TODO: Create Test DBF files and commit them for more detailed tests
 //For now tests are a bit basic
 const (
-	DBF_PATH = "C:/DATA/KENTEKEN.DBF" //No test file is provided at this time, enter your own path here
-	//DBF_PATH = "C:/DATA/KENTEIGEN.DBF"
+	DBF_PATH = "./testdbf/TEST.DBF"
 )
 
 var test_dbf *DBF
@@ -44,16 +43,15 @@ func TestFieldNames(t *testing.T) {
 	t.Log(fieldnames)
 }
 
-//TODO: Comply with testing DBF
 func TestFieldPos(t *testing.T) {
 
 	cases := []struct {
 		name string
 		pos  int
 	}{
-		{"KENTNR", 0},
+		{"NIVEAU", 0},
 		{"BLABLA", -1},
-		{"RV_TMSTMP", 216},
+		{"MELDING", 8},
 	}
 	for _, test := range cases {
 		pos := test_dbf.FieldPos(test.name)
