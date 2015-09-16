@@ -120,8 +120,8 @@ func (dbf *DBF) GoTo(recno uint32) error {
 //Returns ErrEOF if at EOF and positions the pointer at lastRec+1.
 //Returns ErrBOF is recpointer would be become negative and positions the pointer at 0.
 //Does not skip deleted records.
-func (dbf *DBF) Skip(offset int32) error {
-	newval := int64(dbf.recpointer) + int64(offset)
+func (dbf *DBF) Skip(offset int64) error {
+	newval := int64(dbf.recpointer) + offset
 	if newval > int64(dbf.header.NumRec-1) {
 		dbf.recpointer = dbf.header.NumRec
 		return ErrEOF
