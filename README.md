@@ -24,7 +24,7 @@ The focus is on performance while also trying to keep the code readable and easy
 
 # Example
 
-```golang
+```go
 
 func Test() error {
 	//Open file
