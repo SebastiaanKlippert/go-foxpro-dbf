@@ -295,8 +295,6 @@ type FieldHeader struct {
 	Reserved [8]byte  //Reserved
 }
 
-const FieldHeaderSize = 32 //sum of all FieldHeader fieldsizes so we don't have to use reflect or unsafe
-
 //Fieldname as a trimmed string (max length 10)
 func (f *FieldHeader) FieldName() string {
 	return string(bytes.TrimRight(f.Name[:], "\x00"))
@@ -450,7 +448,7 @@ func readHeaderFields(r io.ReadSeeker) ([]FieldHeader, error) {
 		}
 		fields = append(fields, field)
 
-		offset += FieldHeaderSize
+		offset += 32
 	}
 	return fields, nil
 }
