@@ -121,22 +121,16 @@ func (dbf *DBF) GoTo(recno uint32) error {
 //Returns ErrBOF is recpointer would be become negative and positions the pointer at 0.
 //Does not skip deleted records.
 func (dbf *DBF) Skip(offset int32) error {
-	if int64(dbf.recpointer)+int64(offset) > int64(dbf.header.NumRec-1) {
+	newval := int64(dbf.recpointer) + int64(offset)
+	if newval > int64(dbf.header.NumRec-1) {
 		dbf.recpointer = dbf.header.NumRec
 		return ErrEOF
 	}
-	if int64(dbf.recpointer)+int64(offset) < 0 {
+	if newval < 0 {
 		dbf.recpointer = 0
 		return ErrBOF
 	}
-	neg := offset < 0
-	var uintoffset uint32
-	if neg {
-		uintoffset = uint32(-1 * offset)
-	} else {
-		uintoffset = uint32(offset)
-	}
-	dbf.recpointer += uintoffset
+	dbf.recpointer = uint32(newval)
 	return nil
 }
 
@@ -428,12 +422,13 @@ func fieldDataToValue(raw []byte, fieldtype string, decimals uint8) (interface{}
 	switch fieldtype {
 	default:
 		return nil, fmt.Errorf("Unsupported fieldtype: %s", fieldtype)
-	case "C":
+	case "C", "M":
+		//C and M values are stored as strings, but the M comes from the FPT
 		//TODO: Encoding
+		if fieldtype == "M" { //temp
+			raw = []byte("TODO: READ FPT")
+		}
 		return string(raw), nil
-	case "M":
-		//TODO: Encoding
-		return "Memo: TODO", nil
 	case "I":
 		//I values are stored as numeric values
 		return rawToInt(raw)
@@ -453,7 +448,11 @@ func fieldDataToValue(raw []byte, fieldtype string, decimals uint8) (interface{}
 		}
 		return time.Parse("20060102", string(raw))
 	case "L":
-		return len(raw) > 0 && raw[0] == 0, nil
+		//L values are stored as strings T or F, we only check for T, the rest is false...
+		return string(raw) == "T", nil
+	case "V":
+		//V values just return the raw value
+		return raw, nil
 	}
 }
 

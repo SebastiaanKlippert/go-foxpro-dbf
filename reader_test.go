@@ -61,8 +61,9 @@ func TestStatAndFileSize(t *testing.T) {
 //Tests if field headers have been parsed, fails if there are no fields
 func TestFieldNames(t *testing.T) {
 	fieldnames := test_dbf.FieldNames()
-	if len(fieldnames) != 12 {
-		t.Errorf("Expected 12 fields, have %d", len(fieldnames))
+	want := 13
+	if len(fieldnames) != want {
+		t.Errorf("Expected %d fields, have %d", want, len(fieldnames))
 	}
 	t.Log(fieldnames)
 }
@@ -76,7 +77,7 @@ func TestFieldPos(t *testing.T) {
 		{"ID", 0},
 		{"NIVEAU", 1},
 		{"BLABLA", -1},
-		{"FLOAT", 11},
+		{"BOOL", 12},
 	}
 	for _, test := range cases {
 		pos := test_dbf.FieldPos(test.name)
