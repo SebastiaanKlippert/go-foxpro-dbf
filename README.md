@@ -21,3 +21,68 @@ There are several similar packages but they are not suited for our use case, thi
 * Filereaders for scanning files (instead of reading the entire file to memory)
 
 The focus is on performance while also trying to keep the code readable and easy to use.
+
+# Example
+
+```golang
+
+func Test() error {
+	//Open file
+	dbf, err := dbf.OpenFile("TEST.DBF")
+	if err != nil {
+		return err
+	}
+	defer dbf.Close()
+
+	//Loop through all records using recordpointer in DBF struct
+	//Reads the complete record
+	for i := uint32(0); i < dbf.NumRecords(); i++ {
+
+		//This reads the complete record
+		record, err := dbf.Record()
+		if err != nil {
+			return err
+		}
+		dbf.Skip(1)
+
+		//skip deleted records
+		if record.Deleted {
+			continue
+		}
+		//get field by position
+		field1, err := record.Field(0)
+		if err != nil {
+			return err
+		}
+		//get field by name
+		field2, err := record.Field(dbf.FieldPos("NAAM"))
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(field1, field2)
+	}
+
+	//Read only the third field of records 2, 30 and 50
+	recnumbers := []uint32{2, 50, 300}
+	for _, rec := range recnumbers {
+		err := dbf.GoTo(rec)
+		if err != nil {
+			return err
+		}
+		deleted, err := dbf.Deleted()
+		if err != nil {
+			return err
+		}
+		if !deleted {
+			field3, err := dbf.Field(3)
+			if err != nil {
+				return err
+			}
+			fmt.Println(field3)
+		}
+	}
+
+	return nil
+}
+```
