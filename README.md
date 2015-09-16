@@ -34,6 +34,24 @@ func Test() error {
 	}
 	defer dbf.Close()
 
+	//Print all the fieldnames
+	for _, name := range dbf.FieldNames() {
+		fmt.Println(name)
+	}
+
+	//Get fieldinfo for all fields
+	for _, field := range dbf.Fields() {
+		fmt.Println(field.FieldName(), field.FieldType(), field.Decimals /*etc*/)
+	}
+
+	//Read the complete second record
+	record, err := dbf.RecordAt(1)
+	if err != nil {
+		return err
+	}
+	//Print all the fields in their Go values
+	fmt.Println(record.FieldSlice())
+
 	//Loop through all records using recordpointer in DBF struct
 	//Reads the complete record
 	for i := uint32(0); i < dbf.NumRecords(); i++ {
