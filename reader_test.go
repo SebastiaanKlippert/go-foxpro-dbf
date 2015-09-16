@@ -161,23 +161,28 @@ func TestRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec, err := test_dbf.Record()
+	recs := [2]*Record{}
+	recs[0], err = test_dbf.Record()
 	if err != nil {
 		t.Fatal(err)
 	}
-	//t.Log(rec.data)
+	recs[1], err = test_dbf.RecordAt(1)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	//Get fields by pos
-	for _, want := range want_values {
-		val, err := rec.Field(want.pos)
-		if err != nil {
-			t.Error(err)
-		}
-		strval := strings.TrimSpace(fmt.Sprintf("%v", val))
-		strtype := fmt.Sprintf("%T", val)
+	for irec, rec := range recs {
+		for _, want := range want_values {
+			val, err := rec.Field(want.pos)
+			if err != nil {
+				t.Error(err)
+			}
+			strval := strings.TrimSpace(fmt.Sprintf("%v", val))
+			strtype := fmt.Sprintf("%T", val)
 
-		if want.strval != strval || want.strtype != strtype {
-			t.Errorf("Wanted value %s with type %s, have value %s with type %s", want.strval, want.strtype, strval, strtype)
+			if want.strval != strval || want.strtype != strtype {
+				t.Errorf("Record %d: Wanted value %s with type %s, have value %s with type %s", irec, want.strval, want.strtype, strval, strtype)
+			}
 		}
 	}
 }
