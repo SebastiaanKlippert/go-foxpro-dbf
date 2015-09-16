@@ -447,6 +447,9 @@ func fieldDataToValue(raw []byte, fieldtype string, decimals uint8) (interface{}
 		return strconv.ParseFloat(strings.TrimSpace(string(raw)), 64)
 	case "D":
 		//D values are stored as string in format YYYYMMDD, convert to time.Time
+		if string(raw) == strings.Repeat(" ", 8) {
+			return time.Time{}, nil
+		}
 		return time.Parse("20060102", string(raw))
 	case "L":
 		return len(raw) > 0 && raw[0] == 0, nil
