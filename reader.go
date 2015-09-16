@@ -1,3 +1,4 @@
+//package dbf provides code for reading data from FoxPro DBF/FPT files
 package dbf
 
 import (
@@ -18,8 +19,8 @@ var (
 	ErrIncomplete = fmt.Errorf("Incomplete record read")
 )
 
-//The main DBF struct provides all methods for reading files and embeds the file handlers
-//Only files are supported at this time
+//The main DBF struct provides all methods for reading files and embeds the file handlers.
+//Only files are supported at this time.
 type DBF struct {
 	header    *DBFHeader
 	f         *os.File
@@ -94,7 +95,7 @@ func (dbf *DBF) FieldNames() []string {
 }
 
 //Returns the zero-based field position of a fieldname
-//or -1 if not found
+//or -1 if not found.
 func (dbf *DBF) FieldPos(fieldname string) int {
 	for i := 0; i < len(dbf.fields); i++ {
 		if dbf.fields[i].FieldName() == fieldname {
@@ -104,8 +105,8 @@ func (dbf *DBF) FieldPos(fieldname string) int {
 	return -1
 }
 
-//Sets internal record pointer to record recno (zero based)
-//Returns ErrEOF if at EOF and positions the pointer at lastRec+1
+//Sets internal record pointer to record recno (zero based).
+//Returns ErrEOF if at EOF and positions the pointer at lastRec+1.
 func (dbf *DBF) GoTo(recno uint32) error {
 	if recno > dbf.header.NumRec-1 {
 		dbf.recpointer = dbf.header.NumRec
@@ -115,10 +116,10 @@ func (dbf *DBF) GoTo(recno uint32) error {
 	return nil
 }
 
-//Adds offset to the internal record pointer
-//Returns ErrEOF if at EOF and positions the pointer at lastRec+1
-//Returns ErrBOF is recpointer would be become negative and positions the pointer at 0
-//Does not skip deleted records
+//Adds offset to the internal record pointer.
+//Returns ErrEOF if at EOF and positions the pointer at lastRec+1.
+//Returns ErrBOF is recpointer would be become negative and positions the pointer at 0.
+//Does not skip deleted records.
 func (dbf *DBF) Skip(offset int32) error {
 	if int64(dbf.recpointer)+int64(offset) > int64(dbf.header.NumRec-1) {
 		dbf.recpointer = dbf.header.NumRec
@@ -193,8 +194,8 @@ func (dbf *DBF) readRecord(recordpos uint32) ([]byte, error) {
 	return buf, nil
 }
 
-//Converts raw recorddata to a Record struct
-//If the data points to a memo (FPT) file this file is also read
+//Converts raw recorddata to a Record struct.
+//If the data points to a memo (FPT) file this file is also read.
 func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
 	rec := new(Record)
 	rec.Deleted = data[0] == 0x20
@@ -233,16 +234,16 @@ type DBFHeader struct {
 	CodePage    byte     //Code page mark
 }
 
-//Parses the ModYear, ModMonth and ModDay to time.Time
+//Parses the ModYear, ModMonth and ModDay to time.Time.
 //Note: The Date is stored in 2 digits, 15 is 2015, we assume here that all files
-//were modified after the year 2000 and always add 2000
+//were modified after the year 2000 and always add 2000.
 func (h *DBFHeader) Modified() time.Time {
 	return time.Date(2000+int(h.ModYear), time.Month(h.ModMonth), int(h.ModDay), 0, 0, 0, 0, time.Local)
 }
 
-//Returns the calculated number of fields from the header info alone (without the need to read the fieldinfo from the header)
-//This is the fastest way to determine the number of records in the file
-//Note: when OpenFile is used the fields have already been parsed so it is better to call DBF.NumFields in that case
+//Returns the calculated number of fields from the header info alone (without the need to read the fieldinfo from the header).
+//This is the fastest way to determine the number of records in the file.
+//Note: when OpenFile is used the fields have already been parsed so it is better to call DBF.NumFields in that case.
 func (h *DBFHeader) NumFields() uint16 {
 	return uint16((h.FirstRec - 296) / 32)
 }
@@ -259,7 +260,7 @@ type FPTHeader struct {
 	BlockSize uint16  //Block size (bytes per block)
 }
 
-//Field subrecord structure from header
+//Field subrecord structure from header.
 //Header info from https://msdn.microsoft.com/en-us/library/st4a0s68%28VS.80%29.aspx
 type FieldHeader struct {
 	Name     [11]byte //Field name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
@@ -293,7 +294,7 @@ type Record struct {
 
 //Opens a DBF file (and FPT if needed) from disk.
 //After a successful call to this method (no error is returned) the caller
-//should call DBF.Close() to close the embedded file handle(s)
+//should call DBF.Close() to close the embedded file handle(s).
 func OpenFile(filename string) (*DBF, error) {
 
 	filename = filepath.Clean(filename)
@@ -386,8 +387,8 @@ func validFileVersion(version byte) error {
 	}
 }
 
-//Reads fieldinfo from DBF header, starting at pos 32
-//Reads fields until it finds the Header record terminator (0x0D)
+//Reads fieldinfo from DBF header, starting at pos 32.
+//Reads fields until it finds the Header record terminator (0x0D).
 func readHeaderFields(r io.ReadSeeker) ([]FieldHeader, error) {
 	fields := []FieldHeader{}
 
@@ -420,7 +421,7 @@ func readHeaderFields(r io.ReadSeeker) ([]FieldHeader, error) {
 	return fields, nil
 }
 
-//Convert raw field data to the correct type
+//Convert raw field data to the correct type.
 func fieldDataToValue(raw []byte, fieldtype string, decimals uint8) (interface{}, error) {
 	//Not all fieldtypes have been implemented beacause we don't use them in our DBFs
 	//Extend this function if needed
@@ -456,7 +457,7 @@ func fieldDataToValue(raw []byte, fieldtype string, decimals uint8) (interface{}
 	}
 }
 
-//Convert numeric binary byte value to int
+//Convert numeric binary byte value to int.
 func rawToInt(raw []byte) (int32, error) {
 	var val int32 //The DBF size is 4 bytes so an int32 is big enough
 	buf := bytes.NewBuffer(raw)
