@@ -223,21 +223,18 @@ func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
 
 	rec.data = make([]interface{}, dbf.NumFields())
 
-	offset := uint8(1) //deleted flag already read
+	offset := uint16(1) //deleted flag already read
 	for i := 0; i < len(rec.data); i++ {
 		fieldinfo := dbf.fields[i]
-		val, err := fieldDataToValue(data[offset:offset+fieldinfo.Len], fieldinfo.FieldType(), fieldinfo.Decimals)
+		val, err := fieldDataToValue(data[offset:offset+uint16(fieldinfo.Len)], fieldinfo.FieldType(), fieldinfo.Decimals)
 		if err != nil {
-			fmt.Println(err)
-			//return rec, err
+			return rec, err
 		}
 		rec.data[i] = val
 
-		offset += fieldinfo.Len
+		offset += uint16(fieldinfo.Len)
 	}
-	/*for _, val := range rec.data {
-		fmt.Println(val)
-	}*/
+
 	return rec, nil
 }
 
@@ -271,7 +268,7 @@ func (h *DBFHeader) NumFields() uint16 {
 
 //Returns the calculated filesize based on the header info
 func (h *DBFHeader) FileSize() int64 {
-	return 296 + int64(h.NumFields()*32) + int64(h.NumRec*uint32(h.RecLen)) + 1 //why +1?
+	return 296 + int64(h.NumFields()*32) + int64(h.NumRec*uint32(h.RecLen))
 }
 
 //Header info from https://msdn.microsoft.com/en-US/library/8599s21w%28v=vs.80%29.aspx
@@ -470,6 +467,9 @@ func fieldDataToValue(raw []byte, fieldtype string, decimals uint8) (interface{}
 	case "I":
 		//I values are stored as numeric values
 		return rawToInt(raw)
+	case "B":
+		//B (double) values are stored as numeric values
+		return rawToFloat(raw)
 	case "N":
 		//N values are stored as string values
 		if decimals == 0 {
@@ -477,7 +477,7 @@ func fieldDataToValue(raw []byte, fieldtype string, decimals uint8) (interface{}
 		}
 		fallthrough //same as "F"
 	case "F":
-		//N values are stored as string values
+		//F values are stored as string values
 		return strconv.ParseFloat(strings.TrimSpace(string(raw)), 64)
 	case "D":
 		//D values are stored as string in format YYYYMMDD, convert to time.Time
@@ -497,6 +497,14 @@ func fieldDataToValue(raw []byte, fieldtype string, decimals uint8) (interface{}
 //Convert numeric binary byte value to int.
 func rawToInt(raw []byte) (int32, error) {
 	var val int32 //The DBF size is 4 bytes so an int32 is big enough
+	buf := bytes.NewBuffer(raw)
+	err := binary.Read(buf, binary.LittleEndian, &val)
+	return val, err
+}
+
+//Convert numeric binary byte value to float64.
+func rawToFloat(raw []byte) (float64, error) {
+	var val float64
 	buf := bytes.NewBuffer(raw)
 	err := binary.Read(buf, binary.LittleEndian, &val)
 	return val, err
