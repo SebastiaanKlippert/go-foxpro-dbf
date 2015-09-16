@@ -161,6 +161,17 @@ func TestRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	//test if the record is deleted
+	deleted, err := test_dbf.Deleted()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !deleted {
+		t.Errorf("Record should be deleted")
+	}
+
+	//read the same record using Record() and RecordAt()
 	recs := [2]*Record{}
 	recs[0], err = test_dbf.Record()
 	if err != nil {

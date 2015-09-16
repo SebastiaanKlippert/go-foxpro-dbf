@@ -211,6 +211,27 @@ func (dbf *DBF) readRecord(recordpos uint32) ([]byte, error) {
 	return buf, nil
 }
 
+//Returns if the record at recordpos is deleted
+func (dbf *DBF) DeletedAt(recordpos uint32) (bool, error) {
+	if recordpos > dbf.header.NumRec-1 {
+		return false, ErrEOF
+	}
+	buf := make([]byte, 1)
+	read, err := dbf.f.ReadAt(buf, int64(dbf.header.FirstRec)+(int64(recordpos)*int64(dbf.header.RecLen)))
+	if err != nil {
+		return false, err
+	}
+	if read != 1 {
+		return false, ErrIncomplete
+	}
+	return buf[0] == 0x2A, nil
+}
+
+//Returns if the record at the internal record pos is deleted
+func (dbf *DBF) Deleted() (bool, error) {
+	return dbf.DeletedAt(dbf.recpointer)
+}
+
 //Converts raw recorddata to a Record struct.
 //If the data points to a memo (FPT) file this file is also read.
 func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
@@ -276,7 +297,11 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 	case "N":
 		//N values are stored as string values
 		if dbf.fields[fieldpos].Decimals == 0 {
-			return strconv.ParseInt(strings.TrimSpace(string(raw)), 10, 32)
+			trimmed := strings.TrimSpace(string(raw))
+			if len(trimmed) == 0 {
+				return 0, nil
+			}
+			return strconv.ParseInt(trimmed, 10, 32)
 		}
 		fallthrough //same as "F"
 	case "F":
