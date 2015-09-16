@@ -8,7 +8,7 @@ import (
 
 const (
 	TEST_DBF_PATH  = "./testdbf/TEST.DBF"
-	BENCH_DBF_PATH = "C:/DATA/KENTEKEN.DBF" //"./testdbf/TEST.DBF" //For real benchmarks replace this with the path to a large DBF/FPT combo
+	BENCH_DBF_PATH = "./testdbf/TEST.DBF" //For real benchmarks replace this with the path to a large DBF/FPT combo
 )
 
 var test_dbf *DBF
@@ -165,7 +165,7 @@ func TestRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(rec.data)
+	//t.Log(rec.data)
 
 	//Get fields by pos
 	for _, want := range want_values {
