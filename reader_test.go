@@ -2,6 +2,7 @@ package dbf
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -65,26 +66,7 @@ func TestFieldNames(t *testing.T) {
 	if len(fieldnames) != want {
 		t.Errorf("Expected %d fields, have %d", want, len(fieldnames))
 	}
-	t.Log(fieldnames)
-}
-
-func TestFieldPos(t *testing.T) {
-
-	cases := []struct {
-		name string
-		pos  int
-	}{
-		{"ID", 0},
-		{"NIVEAU", 1},
-		{"BLABLA", -1},
-		{"BOOL", 12},
-	}
-	for _, test := range cases {
-		pos := test_dbf.FieldPos(test.name)
-		if pos != test.pos {
-			t.Errorf("Expected field %s at pos %d, found pos %d", test.name, test.pos, pos)
-		}
-	}
+	//t.Log(fieldnames)
 }
 
 func TestNumFields(t *testing.T) {
@@ -93,7 +75,6 @@ func TestNumFields(t *testing.T) {
 	if header != header_calc {
 		t.Errorf("NumFields not equal. DBF NumFields: %d, DBF Header NumField: %d", header, header_calc)
 	}
-
 }
 
 func TestGoTo(t *testing.T) {
@@ -152,7 +133,29 @@ func TestSkip(t *testing.T) {
 	}
 }
 
-//Tests a complete record read, reads the second record which is also deleted
+var want_values = []struct {
+	pos                   int
+	name, strval, strtype string
+}{
+	{0, "ID", "2", "int32"},
+	{10, "NUMBER", "1.2345678999e+08", "float64"},
+	{12, "BOOL", "true", "bool"},
+	{2, "DATUM", "2015-02-03 00:00:00 +0000 UTC", "time.Time"},
+	{7, "COMP_NAME", "TEST2", "string"},
+}
+
+func TestFieldPos(t *testing.T) {
+
+	for _, want := range want_values {
+		pos := test_dbf.FieldPos(want.name)
+		if pos != want.pos {
+			t.Errorf("Wanted fieldpos %d for field %s, have pos %d", want.pos, want.name, pos)
+		}
+	}
+}
+
+//Tests a complete record read, reads the second record which is also deleted,
+//also tests getting field values from record object
 func TestRecord(t *testing.T) {
 	err := test_dbf.GoTo(1)
 	if err != nil {
@@ -162,9 +165,40 @@ func TestRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(rec.data)
+	//t.Log(rec.data)
+
+	//Get fields by pos
+	for _, want := range want_values {
+		val, err := rec.Field(want.pos)
+		if err != nil {
+			t.Error(err)
+		}
+		strval := strings.TrimSpace(fmt.Sprintf("%v", val))
+		strtype := fmt.Sprintf("%T", val)
+
+		if want.strval != strval || want.strtype != strtype {
+			t.Errorf("Wanted value %s with type %s, have value %s with type %s", want.strval, want.strtype, strval, strtype)
+		}
+	}
 }
 
+//Test reading fields field by field
+func TestField(t *testing.T) {
+	for _, want := range want_values {
+		val, err := test_dbf.Field(want.pos)
+		if err != nil {
+			t.Error(err)
+		}
+		strval := strings.TrimSpace(fmt.Sprintf("%v", val))
+		strtype := fmt.Sprintf("%T", val)
+
+		if want.strval != strval || want.strtype != strtype {
+			t.Errorf("Wanted value %s with type %s, have value %s with type %s", want.strval, want.strtype, strval, strtype)
+		}
+	}
+}
+
+//Close file handles
 func TestClose(t *testing.T) {
 	err := test_dbf.Close()
 	if err != nil {

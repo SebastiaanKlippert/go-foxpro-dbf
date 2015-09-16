@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	ErrEOF        = fmt.Errorf("EOF")
-	ErrBOF        = fmt.Errorf("BOF")
-	ErrIncomplete = fmt.Errorf("Incomplete record read")
+	ErrEOF          = fmt.Errorf("EOF")
+	ErrBOF          = fmt.Errorf("BOF")
+	ErrIncomplete   = fmt.Errorf("Incomplete read")
+	ErrInvalidField = fmt.Errorf("Invalid field pos")
 )
 
 //The main DBF struct provides all methods for reading files and embeds the file handlers.
@@ -152,9 +153,14 @@ func (dbf *DBF) RecordAt(nrec uint32) (*Record, error) {
 	return dbf.bytesToRecord(data)
 }
 
-//Reads field nfield at the record number the internal pointer is pointing to
-func (dbf *DBF) Field(nfield uint16) (interface{}, error) {
-	return nil, nil
+//Reads field fieldpos at the record number the internal pointer is pointing to
+func (dbf *DBF) Field(fieldpos int) (interface{}, error) {
+	data, err := dbf.readField(dbf.recpointer, fieldpos)
+	if err != nil {
+		return nil, err
+	}
+	//fieldpos is valid or readField would have returned an error
+	return fieldDataToValue(data, dbf.fields[fieldpos].FieldType(), dbf.fields[fieldpos].Decimals)
 }
 
 //Returns if the internal recordpointer is at EoF
@@ -168,8 +174,23 @@ func (dbf *DBF) BOF() bool {
 }
 
 //Reads raw field data of one field at fieldpos at recordpos
-func (dbf *DBF) readField(recordpos uint32, fieldpos uint16) ([]byte, error) {
-	return nil, nil
+func (dbf *DBF) readField(recordpos uint32, fieldpos int) ([]byte, error) {
+	if recordpos > dbf.header.NumRec-1 {
+		return nil, ErrEOF
+	}
+	if fieldpos < 0 || fieldpos > int(dbf.NumFields()) {
+		return nil, ErrInvalidField
+	}
+	buf := make([]byte, dbf.fields[fieldpos].Len)
+	pos := int64(dbf.header.FirstRec) + (int64(recordpos) * int64(dbf.header.RecLen)) + int64(dbf.fields[fieldpos].Pos)
+	read, err := dbf.f.ReadAt(buf, pos)
+	if err != nil {
+		return buf, err
+	}
+	if read != int(dbf.fields[fieldpos].Len) {
+		return buf, ErrIncomplete
+	}
+	return buf, nil
 }
 
 //Reads raw record data of one record at recordpos
@@ -191,14 +212,20 @@ func (dbf *DBF) readRecord(recordpos uint32) ([]byte, error) {
 //Converts raw recorddata to a Record struct.
 //If the data points to a memo (FPT) file this file is also read.
 func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
+
 	rec := new(Record)
-	rec.Deleted = data[0] == 0x20
+
+	//a record should start with te delete flag, a space (0x20) or * (0x2A)
+	rec.Deleted = data[0] == 0x2A
+	if !rec.Deleted && data[0] != 0x20 {
+		return nil, fmt.Errorf("Invalid record data, no delete flag found at beginning of record")
+	}
+
 	rec.data = make([]interface{}, dbf.NumFields())
 
 	offset := uint8(1) //deleted flag already read
 	for i := 0; i < len(rec.data); i++ {
 		fieldinfo := dbf.fields[i]
-		//fmt.Println(fieldinfo.FieldName())
 		val, err := fieldDataToValue(data[offset:offset+fieldinfo.Len], fieldinfo.FieldType(), fieldinfo.Decimals)
 		if err != nil {
 			fmt.Println(err)
@@ -284,6 +311,19 @@ func (f *FieldHeader) FieldType() string {
 type Record struct {
 	Deleted bool
 	data    []interface{}
+}
+
+//Get fieldvalue by field pos (index)
+func (r *Record) Field(pos int) (interface{}, error) {
+	if pos < 0 || len(r.data) < pos {
+		return 0, ErrInvalidField
+	}
+	return r.data[pos], nil
+}
+
+//Get all fields as a slice
+func (r *Record) FieldSlice() []interface{} {
+	return r.data
 }
 
 //Opens a DBF file (and FPT if needed) from disk.
@@ -417,7 +457,7 @@ func readHeaderFields(r io.ReadSeeker) ([]FieldHeader, error) {
 
 //Convert raw field data to the correct type.
 func fieldDataToValue(raw []byte, fieldtype string, decimals uint8) (interface{}, error) {
-	//Not all fieldtypes have been implemented beacause we don't use them in our DBFs
+	//Not all fieldtypes have been implemented because we don't use them in our DBFs
 	//Extend this function if needed
 	switch fieldtype {
 	default:
