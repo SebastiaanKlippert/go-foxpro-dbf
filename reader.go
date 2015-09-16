@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,10 +15,11 @@ import (
 )
 
 var (
-	ErrEOF          = fmt.Errorf("EOF")
-	ErrBOF          = fmt.Errorf("BOF")
-	ErrIncomplete   = fmt.Errorf("Incomplete read")
-	ErrInvalidField = fmt.Errorf("Invalid field pos")
+	ErrEOF          = fmt.Errorf("EOF")               //Returned when on end of DBF file (after the last record)
+	ErrBOF          = fmt.Errorf("BOF")               //Returned when the record pointer is attempted to be moved before the first record
+	ErrIncomplete   = fmt.Errorf("Incomplete read")   //Returned when the read of a record or field did not complete
+	ErrInvalidField = fmt.Errorf("Invalid field pos") //Returned when an invalid fieldpos is used (<1 or >NumRec)
+	ErrNoFPTFile    = fmt.Errorf("No FPT file")       //Returned when there should be an FPT file but it is not found on disc
 )
 
 //The main DBF struct provides all methods for reading files and embeds the file handlers.
@@ -65,7 +67,7 @@ func (dbf *DBF) Stat() (os.FileInfo, error) {
 //os FileInfo for FPT file
 func (dbf *DBF) StatFPT() (os.FileInfo, error) {
 	if dbf.fptf == nil {
-		return nil, fmt.Errorf("No FPT file")
+		return nil, ErrNoFPTFile
 	}
 	return dbf.fptf.Stat()
 }
@@ -160,7 +162,7 @@ func (dbf *DBF) Field(fieldpos int) (interface{}, error) {
 		return nil, err
 	}
 	//fieldpos is valid or readField would have returned an error
-	return fieldDataToValue(data, dbf.fields[fieldpos].FieldType(), dbf.fields[fieldpos].Decimals)
+	return dbf.fieldDataToValue(data, fieldpos)
 }
 
 //Returns if the internal recordpointer is at EoF
@@ -226,7 +228,7 @@ func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
 	offset := uint16(1) //deleted flag already read
 	for i := 0; i < len(rec.data); i++ {
 		fieldinfo := dbf.fields[i]
-		val, err := fieldDataToValue(data[offset:offset+uint16(fieldinfo.Len)], fieldinfo.FieldType(), fieldinfo.Decimals)
+		val, err := dbf.fieldDataToValue(data[offset:offset+uint16(fieldinfo.Len)], i)
 		if err != nil {
 			return rec, err
 		}
@@ -236,6 +238,105 @@ func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
 	}
 
 	return rec, nil
+}
+
+//Convert raw field data to the correct type for field fieldpos.
+//For C and M fields a charset conversion is done (TODO)
+//For M fields the data is read from the FPT file
+func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) {
+	//Not all fieldtypes have been implemented because we don't use them in our DBFs
+	//Extend this function if needed
+	if fieldpos < 0 || len(dbf.fields) < fieldpos {
+		return nil, ErrInvalidField
+	}
+
+	switch dbf.fields[fieldpos].FieldType() {
+	default:
+		return nil, fmt.Errorf("Unsupported fieldtype: %s", dbf.fields[fieldpos].FieldType())
+	case "M":
+		//M values contain the adress in the FPT file from where to read data
+		memo, is_text, err := dbf.readFPT(raw)
+		if err != nil {
+			return "", err
+		}
+		if is_text {
+			return string(memo), nil
+		}
+		return memo, nil
+	case "C":
+		//C values are stored as strings, the returned string is not trimmed
+		//TODO: Encoding
+		return string(raw), nil
+	case "I":
+		//I values are stored as numeric values
+		return int32(binary.LittleEndian.Uint32(raw)), nil
+	case "B":
+		//B (double) values are stored as numeric values
+		return math.Float64frombits(binary.LittleEndian.Uint64(raw)), nil
+	case "N":
+		//N values are stored as string values
+		if dbf.fields[fieldpos].Decimals == 0 {
+			return strconv.ParseInt(strings.TrimSpace(string(raw)), 10, 32)
+		}
+		fallthrough //same as "F"
+	case "F":
+		//F values are stored as string values
+		return strconv.ParseFloat(strings.TrimSpace(string(raw)), 64)
+	case "D":
+		//D values are stored as string in format YYYYMMDD, convert to time.Time
+		if string(raw) == strings.Repeat(" ", 8) {
+			return time.Time{}, nil
+		}
+		return time.Parse("20060102", string(raw))
+	case "L":
+		//L values are stored as strings T or F, we only check for T, the rest is false...
+		return string(raw) == "T", nil
+	case "V":
+		//V values just return the raw value
+		return raw, nil
+	}
+}
+
+//Reads one or more blocks from the FPT file, called for each memo field.
+//The returnvalue is the raw data and true if the data read is text (false is RAW binary data).
+func (dbf *DBF) readFPT(blockdata []byte) ([]byte, bool, error) {
+
+	if dbf.fptf == nil {
+		return nil, false, ErrNoFPTFile
+	}
+
+	//Determine the block number
+	block := binary.LittleEndian.Uint32(blockdata)
+	//The position in the file is blocknumber*blocksize
+	if _, err := dbf.fptf.Seek(int64(dbf.fptheader.BlockSize)*int64(block), 0); err != nil {
+		return nil, false, err
+	}
+
+	//Read the memo block header, instead of reading into a struct using binary.Read we just read the two
+	//uints in one buffer and then convert, this saves seconds for large DBF files with many memo fields
+	//as it avoids using the reflection in binary.Read
+	hbuf := make([]byte, 8)
+	_, err := dbf.fptf.Read(hbuf)
+	if err != nil {
+		return nil, false, err
+	}
+	sign := binary.BigEndian.Uint32(hbuf[:4])
+	leng := binary.BigEndian.Uint32(hbuf[4:])
+
+	if leng == 0 {
+		//No data according to block header? Not sure if this should be an error instead
+		return []byte{}, sign == 1, nil
+	}
+	//Now read the actual data
+	buf := make([]byte, leng)
+	read, err := dbf.fptf.Read(buf)
+	if err != nil {
+		return buf, false, err
+	}
+	if read != int(leng) {
+		return buf, sign == 1, ErrIncomplete
+	}
+	return buf, sign == 1, nil
 }
 
 //Header info from https://msdn.microsoft.com/en-us/library/st4a0s68%28VS.80%29.aspx
@@ -269,13 +370,6 @@ func (h *DBFHeader) NumFields() uint16 {
 //Returns the calculated filesize based on the header info
 func (h *DBFHeader) FileSize() int64 {
 	return 296 + int64(h.NumFields()*32) + int64(h.NumRec*uint32(h.RecLen))
-}
-
-//Header info from https://msdn.microsoft.com/en-US/library/8599s21w%28v=vs.80%29.aspx
-type FPTHeader struct {
-	NextFree  uint32  //Location of next free block
-	Unused    [2]byte //Unused
-	BlockSize uint16  //Block size (bytes per block)
 }
 
 //Field subrecord structure from header.
@@ -394,19 +488,6 @@ func readDBFHeader(r io.ReadSeeker) (*DBFHeader, error) {
 	return h, nil
 }
 
-func readFPTHeader(r io.ReadSeeker) (*FPTHeader, error) {
-	h := new(FPTHeader)
-	if _, err := r.Seek(0, 0); err != nil {
-		return nil, err
-	}
-	//Integers in memo files are stored with the most significant byte first
-	err := binary.Read(r, binary.BigEndian, h)
-	if err != nil {
-		return nil, err
-	}
-	return h, nil
-}
-
 func validFileVersion(version byte) error {
 	switch version {
 	default:
@@ -450,62 +531,22 @@ func readHeaderFields(r io.ReadSeeker) ([]FieldHeader, error) {
 	return fields, nil
 }
 
-//Convert raw field data to the correct type.
-func fieldDataToValue(raw []byte, fieldtype string, decimals uint8) (interface{}, error) {
-	//Not all fieldtypes have been implemented because we don't use them in our DBFs
-	//Extend this function if needed
-	switch fieldtype {
-	default:
-		return nil, fmt.Errorf("Unsupported fieldtype: %s", fieldtype)
-	case "C", "M":
-		//C and M values are stored as strings, but the M comes from the FPT
-		//TODO: Encoding
-		if fieldtype == "M" { //temp
-			raw = []byte("TODO: READ FPT")
-		}
-		return string(raw), nil
-	case "I":
-		//I values are stored as numeric values
-		return rawToInt(raw)
-	case "B":
-		//B (double) values are stored as numeric values
-		return rawToFloat(raw)
-	case "N":
-		//N values are stored as string values
-		if decimals == 0 {
-			return strconv.ParseInt(strings.TrimSpace(string(raw)), 10, 32)
-		}
-		fallthrough //same as "F"
-	case "F":
-		//F values are stored as string values
-		return strconv.ParseFloat(strings.TrimSpace(string(raw)), 64)
-	case "D":
-		//D values are stored as string in format YYYYMMDD, convert to time.Time
-		if string(raw) == strings.Repeat(" ", 8) {
-			return time.Time{}, nil
-		}
-		return time.Parse("20060102", string(raw))
-	case "L":
-		//L values are stored as strings T or F, we only check for T, the rest is false...
-		return string(raw) == "T", nil
-	case "V":
-		//V values just return the raw value
-		return raw, nil
+//Memo header. Header info from https://msdn.microsoft.com/en-US/library/8599s21w%28v=vs.80%29.aspx
+type FPTHeader struct {
+	NextFree  uint32  //Location of next free block
+	Unused    [2]byte //Unused
+	BlockSize uint16  //Block size (bytes per block)
+}
+
+func readFPTHeader(r io.ReadSeeker) (*FPTHeader, error) {
+	h := new(FPTHeader)
+	if _, err := r.Seek(0, 0); err != nil {
+		return nil, err
 	}
-}
-
-//Convert numeric binary byte value to int.
-func rawToInt(raw []byte) (int32, error) {
-	var val int32 //The DBF size is 4 bytes so an int32 is big enough
-	buf := bytes.NewBuffer(raw)
-	err := binary.Read(buf, binary.LittleEndian, &val)
-	return val, err
-}
-
-//Convert numeric binary byte value to float64.
-func rawToFloat(raw []byte) (float64, error) {
-	var val float64
-	buf := bytes.NewBuffer(raw)
-	err := binary.Read(buf, binary.LittleEndian, &val)
-	return val, err
+	//Integers in memo files are stored with the most significant byte first
+	err := binary.Read(r, binary.BigEndian, h)
+	if err != nil {
+		return nil, err
+	}
+	return h, nil
 }
