@@ -182,12 +182,12 @@ func (dbf *DBF) readRecord(recordpos uint32) ([]byte, error) {
 	if recordpos > dbf.header.NumRec-1 {
 		return nil, ErrEOF
 	}
-	buf := make([]byte, dbf.header.RecordLen)
-	read, err := dbf.f.ReadAt(buf, int64(dbf.header.FirstRec)+(int64(recordpos)*int64(dbf.header.RecordLen)))
+	buf := make([]byte, dbf.header.RecLen)
+	read, err := dbf.f.ReadAt(buf, int64(dbf.header.FirstRec)+(int64(recordpos)*int64(dbf.header.RecLen)))
 	if err != nil {
 		return buf, err
 	}
-	if read != int(dbf.header.RecordLen) {
+	if read != int(dbf.header.RecLen) {
 		return buf, ErrIncomplete
 	}
 	return buf, nil
@@ -227,7 +227,7 @@ type DBFHeader struct {
 	ModDay      uint8    //Last update day
 	NumRec      uint32   //Number of records in file
 	FirstRec    uint16   //Position of first data record
-	RecordLen   uint16   //Length of one data record, including delete flag
+	RecLen      uint16   //Length of one data record, including delete flag
 	Reserved    [16]byte //Reserved
 	TableFlags  byte     //Table flags
 	CodePage    byte     //Code page mark
@@ -245,6 +245,11 @@ func (h *DBFHeader) Modified() time.Time {
 //Note: when OpenFile is used the fields have already been parsed so it is better to call DBF.NumFields in that case
 func (h *DBFHeader) NumFields() uint16 {
 	return uint16((h.FirstRec - 296) / 32)
+}
+
+//Returns the calculated filesize based on the header info
+func (h *DBFHeader) FileSize() int64 {
+	return 296 + int64(h.NumFields()*32) + int64(h.NumRec*uint32(h.RecLen)) + 1 //why +1?
 }
 
 //Header info from https://msdn.microsoft.com/en-US/library/8599s21w%28v=vs.80%29.aspx

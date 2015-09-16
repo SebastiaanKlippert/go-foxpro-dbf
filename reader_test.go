@@ -31,6 +31,8 @@ func TestFieldHeader(t *testing.T) {
 
 //Test if the modified date of Stat() matches the header
 //This is therefore also a header test, these dates should be equal, but not sure if this is always true on every OS
+//Update: Disable for now, fails on other timezones
+/*
 func TestStat(t *testing.T) {
 	stat, err := test_dbf.Stat()
 	if err != nil {
@@ -41,6 +43,18 @@ func TestStat(t *testing.T) {
 	format := "20060102"
 	if stat_mod.Format(format) != hdr_mod.Format(format) {
 		t.Errorf("Modified date in header (%s) not equal to modified date in OS (%s)", hdr_mod.Format(format), stat_mod.Format(format))
+	}
+}*/
+//test with size instead
+func TestStatAndFileSize(t *testing.T) {
+	stat, err := test_dbf.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stat_size := stat.Size()
+	hdr_size := test_dbf.header.FileSize()
+	if stat_size != hdr_size {
+		t.Errorf("Calculated header size: %d, stat size: %d", hdr_size, stat_size)
 	}
 }
 
