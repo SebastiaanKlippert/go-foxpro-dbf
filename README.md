@@ -27,7 +27,7 @@ The focus is on performance while also trying to keep the code readable and easy
 ```go
 func Test() error {
 	//Open file
-	testdbf, err := dbf.OpenFile("C:/DATA/KLANT.DBF", new(dbf.Win1250Decoder))
+	testdbf, err := dbf.OpenFile("TEST.DBF", new(dbf.Win1250Decoder))
 	if err != nil {
 		return err
 	}
