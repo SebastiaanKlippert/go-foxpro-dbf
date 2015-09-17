@@ -114,7 +114,7 @@ func (dbf *DBF) FieldPos(fieldname string) int {
 //Sets internal record pointer to record recno (zero based).
 //Returns ErrEOF if at EOF and positions the pointer at lastRec+1.
 func (dbf *DBF) GoTo(recno uint32) error {
-	if recno > dbf.header.NumRec-1 {
+	if recno >= dbf.header.NumRec {
 		dbf.recpointer = dbf.header.NumRec
 		return ErrEOF
 	}
@@ -128,7 +128,7 @@ func (dbf *DBF) GoTo(recno uint32) error {
 //Does not skip deleted records.
 func (dbf *DBF) Skip(offset int64) error {
 	newval := int64(dbf.recpointer) + offset
-	if newval > int64(dbf.header.NumRec-1) {
+	if newval >= int64(dbf.header.NumRec) {
 		dbf.recpointer = dbf.header.NumRec
 		return ErrEOF
 	}
@@ -170,7 +170,7 @@ func (dbf *DBF) Field(fieldpos int) (interface{}, error) {
 
 //Returns if the internal recordpointer is at EoF
 func (dbf *DBF) EOF() bool {
-	return dbf.recpointer > dbf.header.NumRec-1
+	return dbf.recpointer >= dbf.header.NumRec
 }
 
 //Returns if the internal recordpointer is at BoF (first record)
@@ -180,7 +180,7 @@ func (dbf *DBF) BOF() bool {
 
 //Reads raw field data of one field at fieldpos at recordpos
 func (dbf *DBF) readField(recordpos uint32, fieldpos int) ([]byte, error) {
-	if recordpos > dbf.header.NumRec-1 {
+	if recordpos >= dbf.header.NumRec {
 		return nil, ErrEOF
 	}
 	if fieldpos < 0 || fieldpos > int(dbf.NumFields()) {
@@ -200,7 +200,7 @@ func (dbf *DBF) readField(recordpos uint32, fieldpos int) ([]byte, error) {
 
 //Reads raw record data of one record at recordpos
 func (dbf *DBF) readRecord(recordpos uint32) ([]byte, error) {
-	if recordpos > dbf.header.NumRec-1 {
+	if recordpos >= dbf.header.NumRec {
 		return nil, ErrEOF
 	}
 	buf := make([]byte, dbf.header.RecLen)
@@ -216,7 +216,7 @@ func (dbf *DBF) readRecord(recordpos uint32) ([]byte, error) {
 
 //Returns if the record at recordpos is deleted
 func (dbf *DBF) DeletedAt(recordpos uint32) (bool, error) {
-	if recordpos > dbf.header.NumRec-1 {
+	if recordpos >= dbf.header.NumRec {
 		return false, ErrEOF
 	}
 	buf := make([]byte, 1)
