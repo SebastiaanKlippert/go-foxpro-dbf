@@ -25,27 +25,26 @@ The focus is on performance while also trying to keep the code readable and easy
 # Example
 
 ```go
-
 func Test() error {
 	//Open file
-	dbf, err := dbf.OpenFile("TEST.DBF")
+	testdbf, err := dbf.OpenFile("C:/DATA/KLANT.DBF", new(dbf.Win1250Decoder))
 	if err != nil {
 		return err
 	}
-	defer dbf.Close()
+	defer testdbf.Close()
 
 	//Print all the fieldnames
-	for _, name := range dbf.FieldNames() {
+	for _, name := range testdbf.FieldNames() {
 		fmt.Println(name)
 	}
 
 	//Get fieldinfo for all fields
-	for _, field := range dbf.Fields() {
+	for _, field := range testdbf.Fields() {
 		fmt.Println(field.FieldName(), field.FieldType(), field.Decimals /*etc*/)
 	}
 
 	//Read the complete second record
-	record, err := dbf.RecordAt(1)
+	record, err := testdbf.RecordAt(1)
 	if err != nil {
 		return err
 	}
@@ -54,14 +53,14 @@ func Test() error {
 
 	//Loop through all records using recordpointer in DBF struct
 	//Reads the complete record
-	for i := uint32(0); i < dbf.NumRecords(); i++ {
+	for !testdbf.EOF() { //or for i := uint32(0); i < testdbf.NumRecords(); i++ {
 
 		//This reads the complete record
-		record, err := dbf.Record()
+		record, err := testdbf.Record()
 		if err != nil {
 			return err
 		}
-		dbf.Skip(1)
+		testdbf.Skip(1)
 
 		//skip deleted records
 		if record.Deleted {
@@ -73,7 +72,7 @@ func Test() error {
 			return err
 		}
 		//get field by name
-		field2, err := record.Field(dbf.FieldPos("NAAM"))
+		field2, err := record.Field(testdbf.FieldPos("NAAM"))
 		if err != nil {
 			return err
 		}
@@ -84,16 +83,16 @@ func Test() error {
 	//Read only the third field of records 2, 30 and 50
 	recnumbers := []uint32{2, 50, 300}
 	for _, rec := range recnumbers {
-		err := dbf.GoTo(rec)
+		err := testdbf.GoTo(rec)
 		if err != nil {
 			return err
 		}
-		deleted, err := dbf.Deleted()
+		deleted, err := testdbf.Deleted()
 		if err != nil {
 			return err
 		}
 		if !deleted {
-			field3, err := dbf.Field(3)
+			field3, err := testdbf.Field(3)
 			if err != nil {
 				return err
 			}
