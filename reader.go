@@ -26,9 +26,12 @@ var (
 //Only files are supported at this time.
 type DBF struct {
 	header    *DBFHeader
-	f         *os.File
 	fptheader *FPTHeader
-	fptf      *os.File //if there is an FPT file handler is used for it
+
+	f    *os.File
+	fptf *os.File //if there is an FPT file handler is used for it
+
+	dec Decoder
 
 	fields []FieldHeader
 
@@ -281,13 +284,20 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 			return "", err
 		}
 		if is_text {
-			return string(memo), nil
+			utf8, err := dbf.dec.Decode(memo)
+			if err != nil {
+				return string(raw), err
+			}
+			return string(utf8), nil
 		}
 		return memo, nil
 	case "C":
 		//C values are stored as strings, the returned string is not trimmed
-		//TODO: Encoding
-		return string(raw), nil
+		utf8, err := dbf.dec.Decode(raw)
+		if err != nil {
+			return string(raw), err
+		}
+		return string(utf8), nil
 	case "I":
 		//I values are stored as numeric values
 		return int32(binary.LittleEndian.Uint32(raw)), nil
@@ -443,7 +453,8 @@ func (r *Record) FieldSlice() []interface{} {
 //Opens a DBF file (and FPT if needed) from disk.
 //After a successful call to this method (no error is returned) the caller
 //should call DBF.Close() to close the embedded file handle(s).
-func OpenFile(filename string) (*DBF, error) {
+//The Decoder is used for charset translation to UTF8, see decoder.go
+func OpenFile(filename string, dec Decoder) (*DBF, error) {
 
 	filename = filepath.Clean(filename)
 
@@ -472,6 +483,7 @@ func OpenFile(filename string) (*DBF, error) {
 		header: header,
 		f:      dbffile,
 		fields: fields,
+		dec:    dec,
 	}
 
 	//Check if there is an FPT according to the header

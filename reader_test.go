@@ -15,7 +15,7 @@ var test_dbf *DBF
 
 func TestOpenFile(t *testing.T) {
 	var err error
-	test_dbf, err = OpenFile(TEST_DBF_PATH)
+	test_dbf, err = OpenFile(TEST_DBF_PATH, new(Win1250Decoder))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,6 +177,7 @@ func TestRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	//fmt.Println(recs[0].FieldSlice())
 	recs[1], err = test_dbf.RecordAt(1)
 	if err != nil {
 		t.Fatal(err)
@@ -227,7 +228,7 @@ func TestClose(t *testing.T) {
 func BenchmarkReadRecords(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		err := func() error {
-			dbf, err := OpenFile(BENCH_DBF_PATH)
+			dbf, err := OpenFile(BENCH_DBF_PATH, new(Win1250Decoder))
 			if err != nil {
 				return err
 			}
