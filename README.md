@@ -80,7 +80,7 @@ func Test() error {
 		fmt.Println(field1, field2)
 	}
 
-	//Read only the third field of records 2, 30 and 50
+	//Read only the third field of records 2, 50 and 300
 	recnumbers := []uint32{2, 50, 300}
 	for _, rec := range recnumbers {
 		err := testdbf.GoTo(rec)
