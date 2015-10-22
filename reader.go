@@ -28,8 +28,7 @@ type ReaderAtSeeker interface {
 	io.ReaderAt
 }
 
-//The main DBF struct provides all methods for reading files and embeds the file handlers.
-//Only files are supported at this time.
+//The main DBF struct provides all methods for reading files and embeds the file readers and handlers.
 type DBF struct {
 	header    *DBFHeader
 	fptheader *FPTHeader
@@ -37,8 +36,9 @@ type DBF struct {
 	r    ReaderAtSeeker
 	fptr ReaderAtSeeker
 
+	//os.File handlers are only used with disk files
 	f    *os.File
-	fptf *os.File //if there is an FPT file handler is used for it
+	fptf *os.File
 
 	dec Decoder
 
