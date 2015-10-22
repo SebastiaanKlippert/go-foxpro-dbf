@@ -520,7 +520,7 @@ func OpenFile(filename string, dec Decoder) (*DBF, error) {
 }
 
 //Creates a new DBF from a bytes stream, for example a bytes.Reader
-//The fptfile parameter is optional, but if the DBF header containts an FPT flag it must be provided
+//The fptfile parameter is optional, but if the DBF header contains an FPT flag it must be provided
 //The Decoder is used for charset translation to UTF8, see decoder.go
 func OpenStream(dbffile, fptfile ReaderAtSeeker, dec Decoder) (*DBF, error) {
 
