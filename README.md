@@ -103,3 +103,40 @@ func Test() error {
 	return nil
 }
 ```
+
+# Example using a byte reader
+
+You can use OpenStream with any ReaderAt and ReadSeeker combo, for example a bytes.Reader.
+The FPT stream is only required when the DBF header indicates there must be an FPT file.
+
+```go
+func TestBytes() error {
+	
+	dbfbytes, err := ioutil.ReadFile("TEST.DBF")
+	if err != nil {
+		return err
+	}
+	dbfreader := bytes.NewReader(dbfbytes)
+
+	fptbytes, err := ioutil.ReadFile("TEST.FPT")
+	if err != nil {
+		return err
+	}
+	fptreader := bytes.NewReader(fptbytes)
+
+	test_dbf, err = OpenStream(dbfreader, fptreader, new(Win1250Decoder))
+	if err != nil {
+		return err
+	}
+	defer testdbf.Close()
+
+	//Print all the fieldnames
+	for _, name := range testdbf.FieldNames() {
+		fmt.Println(name)
+	}
+	
+	//ETC...
+	
+	return nil	
+}
+```

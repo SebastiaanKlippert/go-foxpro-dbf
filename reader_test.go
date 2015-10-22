@@ -1,7 +1,11 @@
 package dbf
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
 	"strings"
 	"testing"
 )
@@ -12,12 +16,57 @@ const (
 )
 
 var test_dbf *DBF
+var using_file bool
 
-func TestOpenFile(t *testing.T) {
+//use testmain to run all the tests twice
+//one time with a file opened from disk and one time with a stream
+func TestMain(m *testing.M) {
+
+	fmt.Println("Running tests with file from disk...")
+	using_file = true
+	testOpenFile()
+
+	result := m.Run()
+	test_dbf.Close()
+
+	if result != 0 {
+		os.Exit(result)
+	}
+
+	fmt.Println("Running tests with byte stream...")
+	using_file = false
+	testOpenStream()
+
+	result = m.Run()
+
+	os.Exit(result)
+}
+
+func testOpenFile() {
 	var err error
 	test_dbf, err = OpenFile(TEST_DBF_PATH, new(Win1250Decoder))
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
+	}
+}
+
+func testOpenStream() {
+
+	dbfbytes, err := ioutil.ReadFile(TEST_DBF_PATH)
+	if err != nil {
+		log.Fatal(err)
+	}
+	dbfreader := bytes.NewReader(dbfbytes)
+
+	fptbytes, err := ioutil.ReadFile(strings.Replace(TEST_DBF_PATH, ".DBF", ".FPT", 1))
+	if err != nil {
+		log.Fatal(err)
+	}
+	fptreader := bytes.NewReader(fptbytes)
+
+	test_dbf, err = OpenStream(dbfreader, fptreader, new(Win1250Decoder))
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -30,24 +79,11 @@ func TestFieldHeader(t *testing.T) {
 	}
 }
 
-//Test if the modified date of Stat() matches the header
-//This is therefore also a header test, these dates should be equal, but not sure if this is always true on every OS
-//Update: Disable for now, fails on other timezones
-/*
-func TestStat(t *testing.T) {
-	stat, err := test_dbf.Stat()
-	if err != nil {
-		t.Fatal(err)
-	}
-	stat_mod := stat.ModTime()
-	hdr_mod := test_dbf.header.Modified()
-	format := "20060102"
-	if stat_mod.Format(format) != hdr_mod.Format(format) {
-		t.Errorf("Modified date in header (%s) not equal to modified date in OS (%s)", hdr_mod.Format(format), stat_mod.Format(format))
-	}
-}*/
-//test with size instead
+//Test if file stat size matches header file size, only run when using file mode
 func TestStatAndFileSize(t *testing.T) {
+	if !using_file {
+		return
+	}
 	stat, err := test_dbf.Stat()
 	if err != nil {
 		t.Fatal(err)
@@ -177,7 +213,7 @@ func TestRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	//fmt.Println(recs[0].FieldSlice())
+
 	recs[1], err = test_dbf.RecordAt(1)
 	if err != nil {
 		t.Fatal(err)

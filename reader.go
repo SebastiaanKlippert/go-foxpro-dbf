@@ -18,15 +18,24 @@ var (
 	ErrEOF          = fmt.Errorf("EOF")               //Returned when on end of DBF file (after the last record)
 	ErrBOF          = fmt.Errorf("BOF")               //Returned when the record pointer is attempted to be moved before the first record
 	ErrIncomplete   = fmt.Errorf("Incomplete read")   //Returned when the read of a record or field did not complete
-	ErrInvalidField = fmt.Errorf("Invalid field pos") //Returned when an invalid fieldpos is used (<1 or >NumRec)
+	ErrInvalidField = fmt.Errorf("Invalid field pos") //Returned when an invalid fieldpos is used (<1 or >NumFields)
 	ErrNoFPTFile    = fmt.Errorf("No FPT file")       //Returned when there should be an FPT file but it is not found on disc
+	ErrNoDBFFile    = fmt.Errorf("No DBF file")       //Returned when a file operation is attempted on a DBF but a reader is open
 )
+
+type ReaderAtSeeker interface {
+	io.ReadSeeker
+	io.ReaderAt
+}
 
 //The main DBF struct provides all methods for reading files and embeds the file handlers.
 //Only files are supported at this time.
 type DBF struct {
 	header    *DBFHeader
 	fptheader *FPTHeader
+
+	r    ReaderAtSeeker
+	fptr ReaderAtSeeker
 
 	f    *os.File
 	fptf *os.File //if there is an FPT file handler is used for it
@@ -57,6 +66,18 @@ func (dbf *DBF) Close() error {
 	}
 }
 
+func (dbf *DBF) prepareFPT(fptfile ReaderAtSeeker) error {
+
+	fptheader, err := readFPTHeader(fptfile)
+	if err != nil {
+		return err
+	}
+
+	dbf.fptr = fptfile
+	dbf.fptheader = fptheader
+	return nil
+}
+
 //Returns the DBF Header struct for inspecting
 func (dbf *DBF) Header() *DBFHeader {
 	return dbf.header
@@ -64,6 +85,9 @@ func (dbf *DBF) Header() *DBFHeader {
 
 //os FileInfo for DBF file
 func (dbf *DBF) Stat() (os.FileInfo, error) {
+	if dbf.f == nil {
+		return nil, ErrNoDBFFile
+	}
 	return dbf.f.Stat()
 }
 
@@ -188,7 +212,7 @@ func (dbf *DBF) readField(recordpos uint32, fieldpos int) ([]byte, error) {
 	}
 	buf := make([]byte, dbf.fields[fieldpos].Len)
 	pos := int64(dbf.header.FirstRec) + (int64(recordpos) * int64(dbf.header.RecLen)) + int64(dbf.fields[fieldpos].Pos)
-	read, err := dbf.f.ReadAt(buf, pos)
+	read, err := dbf.r.ReadAt(buf, pos)
 	if err != nil {
 		return buf, err
 	}
@@ -204,7 +228,7 @@ func (dbf *DBF) readRecord(recordpos uint32) ([]byte, error) {
 		return nil, ErrEOF
 	}
 	buf := make([]byte, dbf.header.RecLen)
-	read, err := dbf.f.ReadAt(buf, int64(dbf.header.FirstRec)+(int64(recordpos)*int64(dbf.header.RecLen)))
+	read, err := dbf.r.ReadAt(buf, int64(dbf.header.FirstRec)+(int64(recordpos)*int64(dbf.header.RecLen)))
 	if err != nil {
 		return buf, err
 	}
@@ -220,7 +244,7 @@ func (dbf *DBF) DeletedAt(recordpos uint32) (bool, error) {
 		return false, ErrEOF
 	}
 	buf := make([]byte, 1)
-	read, err := dbf.f.ReadAt(buf, int64(dbf.header.FirstRec)+(int64(recordpos)*int64(dbf.header.RecLen)))
+	read, err := dbf.r.ReadAt(buf, int64(dbf.header.FirstRec)+(int64(recordpos)*int64(dbf.header.RecLen)))
 	if err != nil {
 		return false, err
 	}
@@ -265,7 +289,7 @@ func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
 }
 
 //Convert raw field data to the correct type for field fieldpos.
-//For C and M fields a charset conversion is done (TODO)
+//For C and M fields a charset conversion is done
 //For M fields the data is read from the FPT file
 func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) {
 	//Not all fieldtypes have been implemented because we don't use them in our DBFs
@@ -336,14 +360,14 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 //The returnvalue is the raw data and true if the data read is text (false is RAW binary data).
 func (dbf *DBF) readFPT(blockdata []byte) ([]byte, bool, error) {
 
-	if dbf.fptf == nil {
+	if dbf.fptr == nil {
 		return nil, false, ErrNoFPTFile
 	}
 
 	//Determine the block number
 	block := binary.LittleEndian.Uint32(blockdata)
 	//The position in the file is blocknumber*blocksize
-	if _, err := dbf.fptf.Seek(int64(dbf.fptheader.BlockSize)*int64(block), 0); err != nil {
+	if _, err := dbf.fptr.Seek(int64(dbf.fptheader.BlockSize)*int64(block), 0); err != nil {
 		return nil, false, err
 	}
 
@@ -351,7 +375,7 @@ func (dbf *DBF) readFPT(blockdata []byte) ([]byte, bool, error) {
 	//uints in one buffer and then convert, this saves seconds for large DBF files with many memo fields
 	//as it avoids using the reflection in binary.Read
 	hbuf := make([]byte, 8)
-	_, err := dbf.fptf.Read(hbuf)
+	_, err := dbf.fptr.Read(hbuf)
 	if err != nil {
 		return nil, false, err
 	}
@@ -364,7 +388,7 @@ func (dbf *DBF) readFPT(blockdata []byte) ([]byte, bool, error) {
 	}
 	//Now read the actual data
 	buf := make([]byte, leng)
-	read, err := dbf.fptf.Read(buf)
+	read, err := dbf.fptr.Read(buf)
 	if err != nil {
 		return buf, false, err
 	}
@@ -463,6 +487,63 @@ func OpenFile(filename string, dec Decoder) (*DBF, error) {
 		return nil, err
 	}
 
+	dbf, err := prepareDBF(dbffile, dec)
+	if err != nil {
+		return nil, err
+	}
+
+	dbf.f = dbffile
+
+	//Check if there is an FPT according to the header
+	//If there is we will try to open it in the same dir (using the same filename and case)
+	//If the FPT file does not exist an error is returned
+	if (dbf.header.TableFlags & 0x02) != 0 {
+		ext := filepath.Ext(filename)
+		fptext := ".fpt"
+		if strings.ToUpper(ext) == ext {
+			fptext = ".FPT"
+		}
+		fptfile, err := os.Open(strings.TrimSuffix(filename, ext) + fptext)
+		if err != nil {
+			return nil, err
+		}
+
+		err = dbf.prepareFPT(fptfile)
+		if err != nil {
+			return nil, err
+		}
+
+		dbf.fptf = fptfile
+	}
+
+	return dbf, nil
+}
+
+//Creates a new DBF from a bytes stream, for example a bytes.Reader
+//The fptfile parameter is optional, but if the DBF header containts an FPT flag it must be provided
+//The Decoder is used for charset translation to UTF8, see decoder.go
+func OpenStream(dbffile, fptfile ReaderAtSeeker, dec Decoder) (*DBF, error) {
+
+	dbf, err := prepareDBF(dbffile, dec)
+	if err != nil {
+		return nil, err
+	}
+
+	if (dbf.header.TableFlags & 0x02) != 0 {
+		if fptfile == nil {
+			return nil, ErrNoFPTFile
+		}
+		err = dbf.prepareFPT(fptfile)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return dbf, nil
+}
+
+func prepareDBF(dbffile ReaderAtSeeker, dec Decoder) (*DBF, error) {
+
 	header, err := readDBFHeader(dbffile)
 	if err != nil {
 		return nil, err
@@ -481,32 +562,9 @@ func OpenFile(filename string, dec Decoder) (*DBF, error) {
 
 	dbf := &DBF{
 		header: header,
-		f:      dbffile,
+		r:      dbffile,
 		fields: fields,
 		dec:    dec,
-	}
-
-	//Check if there is an FPT according to the header
-	//If there is we will try to open it in the same dir (using the same filename and case)
-	//If the FPT file does not exist an error is returned
-	if (header.TableFlags & 0x02) != 0 {
-		ext := filepath.Ext(filename)
-		fptext := ".fpt"
-		if strings.ToUpper(ext) == ext {
-			fptext = ".FPT"
-		}
-		fptfile, err := os.Open(strings.TrimSuffix(filename, ext) + fptext)
-		if err != nil {
-			return nil, err
-		}
-
-		fptheader, err := readFPTHeader(fptfile)
-		if err != nil {
-			return nil, err
-		}
-
-		dbf.fptf = fptfile
-		dbf.fptheader = fptheader
 	}
 
 	return dbf, nil
