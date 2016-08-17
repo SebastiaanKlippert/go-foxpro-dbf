@@ -251,6 +251,34 @@ func TestField(t *testing.T) {
 	}
 }
 
+func TestRecordToJson(t *testing.T) {
+
+	want1 := `{"BOOL":true,"COMP_NAME":"TEST2","COMP_OS":"Windows XP","DATUM":"2015-02-03T00:00:00Z","FLOAT":1.23456789e+08,"ID":2,"ID_NR":6425886,"MELDING":"Tësting wíth éncôdings!","NIVEAU":1,"NUMBER":1.2345678999e+08,"SOORT":12345678,"TIJD":"12:00","USERNR":-600}`
+	want2 := `{"BOOL":true,"COMP_NAME":"                                        ","COMP_OS":"                    ","DATUM":"0001-01-01T00:00:00Z","FLOAT":0,"ID":4,"ID_NR":0,"MELDING":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","NIVEAU":0,"NUMBER":0,"SOORT":0,"TIJD":"        ","USERNR":0}`
+
+	data, err := test_dbf.RecordToJSON(1, true)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(data) != want1 {
+		t.Errorf("\nWanted json\n%s\nhave json\n%s\n", want1, string(data))
+	}
+
+	err = test_dbf.GoTo(3)
+	if err != nil {
+		t.Error(err)
+	}
+
+	data, err = test_dbf.RecordToJSON(0, false)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(data) != want2 {
+		t.Errorf("\nWanted json\n%s\nhave json\n%s\n", want2, string(data))
+	}
+
+}
+
 //Close file handles
 func TestClose(t *testing.T) {
 	err := test_dbf.Close()
@@ -278,6 +306,24 @@ func BenchmarkReadRecords(b *testing.B) {
 			}
 			return nil
 		}()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkRecordToJSONWithTrim(b *testing.B) {
+
+	dbf, err := OpenFile(BENCH_DBF_PATH, new(Win1250Decoder))
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer dbf.Close()
+
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		_, err = dbf.RecordToJSON(1, true)
 		if err != nil {
 			b.Fatal(err)
 		}

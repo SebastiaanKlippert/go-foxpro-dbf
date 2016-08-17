@@ -4,6 +4,7 @@ package dbf
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -173,13 +174,53 @@ func (dbf *DBF) Record() (*Record, error) {
 	return dbf.bytesToRecord(data)
 }
 
-//Reads  the complete record number nrec
+//Reads the complete record number nrec
 func (dbf *DBF) RecordAt(nrec uint32) (*Record, error) {
 	data, err := dbf.readRecord(nrec)
 	if err != nil {
 		return nil, err
 	}
 	return dbf.bytesToRecord(data)
+}
+
+//RecordToMap returns a complete record as a map.
+//If nrec > 0 it returns the record at nrec, if nrec <= 0 it returns the record at dbf.recpointer
+func (dbf *DBF) RecordToMap(nrec uint32) (map[string]interface{}, error) {
+	if nrec <= 0 {
+		nrec = dbf.recpointer
+	} else if nrec != dbf.recpointer {
+		if err := dbf.GoTo(nrec); err != nil {
+			return nil, err
+		}
+	}
+	out := make(map[string]interface{})
+	for i, fn := range dbf.FieldNames() {
+		val, err := dbf.Field(i)
+		if err != nil {
+			return out, err
+		}
+		out[fn] = val
+	}
+	return out, nil
+}
+
+//RecordToJSON returns a complete record as a JSON object.
+//If nrec > 0 it returns the record at nrec, if nrec <= 0 it returns the record at dbf.recpointer.
+//If trimspaces is true we trim spaces from string values (this is slower because of an extra reflect operation and all strings in the record map are re-assigned)
+func (dbf *DBF) RecordToJSON(nrec uint32, trimspaces bool) ([]byte, error) {
+	m, err := dbf.RecordToMap(nrec)
+	if err != nil {
+		return nil, err
+	}
+	if trimspaces {
+		for k, v := range m {
+			switch x := v.(type) {
+			case string:
+				m[k] = strings.TrimSpace(x)
+			}
+		}
+	}
+	return json.Marshal(m)
 }
 
 //Reads field fieldpos at the record number the internal pointer is pointing to
