@@ -1,4 +1,4 @@
-//Package dbf provides code for reading data from FoxPro DBF/FPT files
+// Package dbf provides code for reading data from FoxPro DBF/FPT files
 package dbf
 
 import (
@@ -17,22 +17,22 @@ import (
 )
 
 var (
-	//Returned when on end of DBF file (after the last record)
+	//ErrEOF is returned when on end of DBF file (after the last record)
 	ErrEOF          = errors.New("EOF")
 
-	//Returned when the record pointer is attempted to be moved before the first record
+	//ErrBOF is returned when the record pointer is attempted to be moved before the first record
 	ErrBOF          = errors.New("BOF")
 
-	//Returned when the read of a record or field did not complete
+	//ErrIncomplete is returned when the read of a record or field did not complete
 	ErrIncomplete   = errors.New("Incomplete read")
 
-	//Returned when an invalid fieldpos is used (<1 or >NumFields)
+	//ErrInvalidField is returned when an invalid fieldpos is used (<1 or >NumFields)
 	ErrInvalidField = errors.New("Invalid field pos")
 
-	//Returned when there should be an FPT file but it is not found on disc
+	//ErrNoFPTFile is returned when there should be an FPT file but it is not found on disc
 	ErrNoFPTFile    = errors.New("No FPT file")
 
-	//Returned when a file operation is attempted on a DBF but a reader is open
+	//ErrNoDBFFile is returned when a file operation is attempted on a DBF but a reader is open
 	ErrNoDBFFile    = errors.New("No DBF file")
 )
 
@@ -347,7 +347,7 @@ func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
 //For C and M fields a charset conversion is done
 //For M fields the data is read from the FPT file
 func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) {
-	//Not all fieldtypes have been implemented because we don't use them in our DBFs
+	//Not all field types have been implemented because we don't use them in our DBFs
 	//Extend this function if needed
 	if fieldpos < 0 || len(dbf.fields) < fieldpos {
 		return nil, ErrInvalidField
@@ -358,11 +358,11 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 		return nil, fmt.Errorf("Unsupported fieldtype: %s", dbf.fields[fieldpos].FieldType())
 	case "M":
 		//M values contain the address in the FPT file from where to read data
-		memo, is_text, err := dbf.readFPT(raw)
+		memo, isText, err := dbf.readFPT(raw)
 		if err != nil {
 			return "", err
 		}
-		if is_text {
+		if isText {
 			return dbf.toUTF8String(memo)
 		}
 		return memo, nil
@@ -488,7 +488,7 @@ func (h *DBFHeader) FileSize() int64 {
 	return 296 + int64(h.NumFields()*32) + int64(h.NumRec*uint32(h.RecLen))
 }
 
-//Field subrecord structure from header.
+//FieldHeader contains the raw field info structure from the DBF header.
 //Header info from https://msdn.microsoft.com/en-us/library/st4a0s68%28VS.80%29.aspx
 type FieldHeader struct {
 	Name     [11]byte //Field name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
@@ -502,12 +502,12 @@ type FieldHeader struct {
 	Reserved [8]byte  //Reserved
 }
 
-//Fieldname as a trimmed string (max length 10)
+//FieldName returns the name of the field as a trimmed string (max length 10)
 func (f *FieldHeader) FieldName() string {
 	return string(bytes.TrimRight(f.Name[:], "\x00"))
 }
 
-//Fieldtype as string (length 1)
+//FieldType returns the type of the field as string (length 1)
 func (f *FieldHeader) FieldType() string {
 	return string(f.Type)
 }
