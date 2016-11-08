@@ -24,6 +24,7 @@ var (
 	ErrNoDBFFile    = fmt.Errorf("No DBF file")       //Returned when a file operation is attempted on a DBF but a reader is open
 )
 
+//ReaderAtSeeker is used when opening files from memory
 type ReaderAtSeeker interface {
 	io.ReadSeeker
 	io.ReaderAt
@@ -48,6 +49,7 @@ type DBF struct {
 	recpointer uint32 //internal record pointer, can be moved using Skip() and GoTo()
 }
 
+//Close closes the file handlers to the disk files.
 //The caller is responsible for calling Close to close the file handle(s)!
 func (dbf *DBF) Close() error {
 	var dbferr, fpterr error
@@ -79,12 +81,12 @@ func (dbf *DBF) prepareFPT(fptfile ReaderAtSeeker) error {
 	return nil
 }
 
-//Returns the DBF Header struct for inspecting
+//Header returns the DBF Header struct for inspecting
 func (dbf *DBF) Header() *DBFHeader {
 	return dbf.header
 }
 
-//os FileInfo for DBF file
+//Stat returns the os.FileInfo for the DBF file
 func (dbf *DBF) Stat() (os.FileInfo, error) {
 	if dbf.f == nil {
 		return nil, ErrNoDBFFile
@@ -92,7 +94,7 @@ func (dbf *DBF) Stat() (os.FileInfo, error) {
 	return dbf.f.Stat()
 }
 
-//os FileInfo for FPT file
+//StatFPT returns the os.FileInfo for the FPT file
 func (dbf *DBF) StatFPT() (os.FileInfo, error) {
 	if dbf.fptf == nil {
 		return nil, ErrNoFPTFile
@@ -100,22 +102,22 @@ func (dbf *DBF) StatFPT() (os.FileInfo, error) {
 	return dbf.fptf.Stat()
 }
 
-//Returns the number of records
+//NumRecords returns the number of records
 func (dbf *DBF) NumRecords() uint32 {
 	return dbf.header.NumRec
 }
 
-//Returns all the FieldHeaders
+//Fields returns all the FieldHeaders
 func (dbf *DBF) Fields() []FieldHeader {
 	return dbf.fields
 }
 
-//Returns the number of fields
+//NumFields returns the number of fields
 func (dbf *DBF) NumFields() uint16 {
 	return uint16(len(dbf.fields))
 }
 
-//Returnes a slice of all the fieldnames
+//FieldNames returnes a slice of all the fieldnames
 func (dbf *DBF) FieldNames() []string {
 	num := len(dbf.fields)
 	names := make([]string, num)
@@ -125,7 +127,7 @@ func (dbf *DBF) FieldNames() []string {
 	return names
 }
 
-//Returns the zero-based field position of a fieldname
+//FieldPos returns the zero-based field position of a fieldname
 //or -1 if not found.
 func (dbf *DBF) FieldPos(fieldname string) int {
 	for i := 0; i < len(dbf.fields); i++ {
@@ -136,7 +138,7 @@ func (dbf *DBF) FieldPos(fieldname string) int {
 	return -1
 }
 
-//Sets internal record pointer to record recno (zero based).
+//GoTo sets the internal record pointer to record recno (zero based).
 //Returns ErrEOF if at EOF and positions the pointer at lastRec+1.
 func (dbf *DBF) GoTo(recno uint32) error {
 	if recno >= dbf.header.NumRec {
@@ -147,7 +149,7 @@ func (dbf *DBF) GoTo(recno uint32) error {
 	return nil
 }
 
-//Adds offset to the internal record pointer.
+//Skip adds offset to the internal record pointer.
 //Returns ErrEOF if at EOF and positions the pointer at lastRec+1.
 //Returns ErrBOF is recpointer would be become negative and positions the pointer at 0.
 //Does not skip deleted records.
@@ -165,7 +167,7 @@ func (dbf *DBF) Skip(offset int64) error {
 	return nil
 }
 
-//Reads the complete record the internal record pointer is pointing to
+//Record reads the complete record the internal record pointer is pointing to
 func (dbf *DBF) Record() (*Record, error) {
 	data, err := dbf.readRecord(dbf.recpointer)
 	if err != nil {
@@ -174,7 +176,7 @@ func (dbf *DBF) Record() (*Record, error) {
 	return dbf.bytesToRecord(data)
 }
 
-//Reads the complete record number nrec
+//RecordAt reads the complete record number nrec
 func (dbf *DBF) RecordAt(nrec uint32) (*Record, error) {
 	data, err := dbf.readRecord(nrec)
 	if err != nil {
@@ -223,7 +225,7 @@ func (dbf *DBF) RecordToJSON(nrec uint32, trimspaces bool) ([]byte, error) {
 	return json.Marshal(m)
 }
 
-//Reads field fieldpos at the record number the internal pointer is pointing to
+//Field reads field number fieldpos at the record number the internal pointer is pointing to and returns its Go value
 func (dbf *DBF) Field(fieldpos int) (interface{}, error) {
 	data, err := dbf.readField(dbf.recpointer, fieldpos)
 	if err != nil {
@@ -233,12 +235,12 @@ func (dbf *DBF) Field(fieldpos int) (interface{}, error) {
 	return dbf.fieldDataToValue(data, fieldpos)
 }
 
-//Returns if the internal recordpointer is at EoF
+//EOF returns if the internal recordpointer is at EoF
 func (dbf *DBF) EOF() bool {
 	return dbf.recpointer >= dbf.header.NumRec
 }
 
-//Returns if the internal recordpointer is at BoF (first record)
+//BOF returns if the internal recordpointer is at BoF (first record)
 func (dbf *DBF) BOF() bool {
 	return dbf.recpointer == 0
 }
@@ -279,7 +281,7 @@ func (dbf *DBF) readRecord(recordpos uint32) ([]byte, error) {
 	return buf, nil
 }
 
-//Returns if the record at recordpos is deleted
+//DeletedAt returns if the record at recordpos is deleted
 func (dbf *DBF) DeletedAt(recordpos uint32) (bool, error) {
 	if recordpos >= dbf.header.NumRec {
 		return false, ErrEOF
@@ -295,7 +297,7 @@ func (dbf *DBF) DeletedAt(recordpos uint32) (bool, error) {
 	return buf[0] == 0x2A, nil
 }
 
-//Returns if the record at the internal record pos is deleted
+//Deleted returns if the record at the internal record pos is deleted
 func (dbf *DBF) Deleted() (bool, error) {
 	return dbf.DeletedAt(dbf.recpointer)
 }
@@ -439,6 +441,7 @@ func (dbf *DBF) readFPT(blockdata []byte) ([]byte, bool, error) {
 	return buf, sign == 1, nil
 }
 
+//DBFHeader is the struct containing all raw DBF header fields.
 //Header info from https://msdn.microsoft.com/en-us/library/st4a0s68%28VS.80%29.aspx
 type DBFHeader struct {
 	FileVersion byte     //File type flag
@@ -453,8 +456,8 @@ type DBFHeader struct {
 	CodePage    byte     //Code page mark
 }
 
-//Parses the ModYear, ModMonth and ModDay to time.Time.
-//Note: The Date is stored in 2 digits, 15 is 2015, we assume here that all files
+//Modified parses the ModYear, ModMonth and ModDay to time.Time.
+//Note: The year is stored in 2 digits, 15 is 2015, we assume here that all files
 //were modified after the year 2000 and always add 2000.
 func (h *DBFHeader) Modified() time.Time {
 	return time.Date(2000+int(h.ModYear), time.Month(h.ModMonth), int(h.ModDay), 0, 0, 0, 0, time.Local)
