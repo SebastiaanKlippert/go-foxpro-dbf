@@ -1,4 +1,4 @@
-//package dbf provides code for reading data from FoxPro DBF/FPT files
+//Package dbf provides code for reading data from FoxPro DBF/FPT files
 package dbf
 
 import (
@@ -13,15 +13,27 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"errors"
 )
 
 var (
-	ErrEOF          = fmt.Errorf("EOF")               //Returned when on end of DBF file (after the last record)
-	ErrBOF          = fmt.Errorf("BOF")               //Returned when the record pointer is attempted to be moved before the first record
-	ErrIncomplete   = fmt.Errorf("Incomplete read")   //Returned when the read of a record or field did not complete
-	ErrInvalidField = fmt.Errorf("Invalid field pos") //Returned when an invalid fieldpos is used (<1 or >NumFields)
-	ErrNoFPTFile    = fmt.Errorf("No FPT file")       //Returned when there should be an FPT file but it is not found on disc
-	ErrNoDBFFile    = fmt.Errorf("No DBF file")       //Returned when a file operation is attempted on a DBF but a reader is open
+	//Returned when on end of DBF file (after the last record)
+	ErrEOF          = errors.New("EOF")
+
+	//Returned when the record pointer is attempted to be moved before the first record
+	ErrBOF          = errors.New("BOF")
+
+	//Returned when the read of a record or field did not complete
+	ErrIncomplete   = errors.New("Incomplete read")
+
+	//Returned when an invalid fieldpos is used (<1 or >NumFields)
+	ErrInvalidField = errors.New("Invalid field pos")
+
+	//Returned when there should be an FPT file but it is not found on disc
+	ErrNoFPTFile    = errors.New("No FPT file")
+
+	//Returned when a file operation is attempted on a DBF but a reader is open
+	ErrNoDBFFile    = errors.New("No DBF file")
 )
 
 //ReaderAtSeeker is used when opening files from memory
@@ -30,7 +42,7 @@ type ReaderAtSeeker interface {
 	io.ReaderAt
 }
 
-//The main DBF struct provides all methods for reading files and embeds the file readers and handlers.
+//DBF is the main DBF struct which provides all methods for reading files and embeds the file readers and handlers.
 type DBF struct {
 	header    *DBFHeader
 	fptheader *FPTHeader
@@ -311,7 +323,7 @@ func (dbf *DBF) bytesToRecord(data []byte) (*Record, error) {
 	//a record should start with te delete flag, a space (0x20) or * (0x2A)
 	rec.Deleted = data[0] == 0x2A
 	if !rec.Deleted && data[0] != 0x20 {
-		return nil, fmt.Errorf("Invalid record data, no delete flag found at beginning of record")
+		return nil, errors.New("Invalid record data, no delete flag found at beginning of record")
 	}
 
 	rec.data = make([]interface{}, dbf.NumFields())
@@ -345,32 +357,36 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 	default:
 		return nil, fmt.Errorf("Unsupported fieldtype: %s", dbf.fields[fieldpos].FieldType())
 	case "M":
-		//M values contain the adress in the FPT file from where to read data
+		//M values contain the address in the FPT file from where to read data
 		memo, is_text, err := dbf.readFPT(raw)
 		if err != nil {
 			return "", err
 		}
 		if is_text {
-			utf8, err := dbf.dec.Decode(memo)
-			if err != nil {
-				return string(raw), err
-			}
-			return string(utf8), nil
+			return dbf.toUTF8String(memo)
 		}
 		return memo, nil
 	case "C":
 		//C values are stored as strings, the returned string is not trimmed
-		utf8, err := dbf.dec.Decode(raw)
-		if err != nil {
-			return string(raw), err
-		}
-		return string(utf8), nil
+		return dbf.toUTF8String(raw)
 	case "I":
 		//I values are stored as numeric values
 		return int32(binary.LittleEndian.Uint32(raw)), nil
 	case "B":
 		//B (double) values are stored as numeric values
 		return math.Float64frombits(binary.LittleEndian.Uint64(raw)), nil
+	case "D":
+		//D values are stored as string in format YYYYMMDD, convert to time.Time
+		if string(raw) == strings.Repeat(" ", 8) {
+			return time.Time{}, nil
+		}
+		return time.Parse("20060102", string(raw))
+	case "L":
+		//L values are stored as strings T or F, we only check for T, the rest is false...
+		return string(raw) == "T", nil
+	case "V":
+		//V values just return the raw value
+		return raw, nil
 	case "N":
 		//N values are stored as string values
 		if dbf.fields[fieldpos].Decimals == 0 {
@@ -384,23 +400,20 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 	case "F":
 		//F values are stored as string values
 		return strconv.ParseFloat(strings.TrimSpace(string(raw)), 64)
-	case "D":
-		//D values are stored as string in format YYYYMMDD, convert to time.Time
-		if string(raw) == strings.Repeat(" ", 8) {
-			return time.Time{}, nil
-		}
-		return time.Parse("20060102", string(raw))
-	case "L":
-		//L values are stored as strings T or F, we only check for T, the rest is false...
-		return string(raw) == "T", nil
-	case "V":
-		//V values just return the raw value
-		return raw, nil
 	}
 }
 
+//toUTF8String converts a byte slice to a UTF8 string using the decoder in dbf
+func (dbf *DBF) toUTF8String(raw []byte) (string, error) {
+	utf8, err := dbf.dec.Decode(raw)
+	if err != nil {
+		return string(raw), err
+	}
+	return string(utf8), nil
+}
+
 //Reads one or more blocks from the FPT file, called for each memo field.
-//The returnvalue is the raw data and true if the data read is text (false is RAW binary data).
+//The return value is the raw data and true if the data read is text (false is RAW binary data).
 func (dbf *DBF) readFPT(blockdata []byte) ([]byte, bool, error) {
 
 	if dbf.fptr == nil {
@@ -463,14 +476,14 @@ func (h *DBFHeader) Modified() time.Time {
 	return time.Date(2000+int(h.ModYear), time.Month(h.ModMonth), int(h.ModDay), 0, 0, 0, 0, time.Local)
 }
 
-//Returns the calculated number of fields from the header info alone (without the need to read the fieldinfo from the header).
+//NumFields returns the calculated number of fields from the header info alone (without the need to read the fieldinfo from the header).
 //This is the fastest way to determine the number of records in the file.
 //Note: when OpenFile is used the fields have already been parsed so it is better to call DBF.NumFields in that case.
 func (h *DBFHeader) NumFields() uint16 {
 	return uint16((h.FirstRec - 296) / 32)
 }
 
-//Returns the calculated filesize based on the header info
+//FileSize eturns the calculated file size based on the header info
 func (h *DBFHeader) FileSize() int64 {
 	return 296 + int64(h.NumFields()*32) + int64(h.NumRec*uint32(h.RecLen))
 }
@@ -499,13 +512,13 @@ func (f *FieldHeader) FieldType() string {
 	return string(f.Type)
 }
 
-//Record data
+//Record contains the raw record data and a deleted flag
 type Record struct {
 	Deleted bool
 	data    []interface{}
 }
 
-//Get fieldvalue by field pos (index)
+//Field gets a fields value by field pos (index)
 func (r *Record) Field(pos int) (interface{}, error) {
 	if pos < 0 || len(r.data) < pos {
 		return 0, ErrInvalidField
@@ -513,7 +526,7 @@ func (r *Record) Field(pos int) (interface{}, error) {
 	return r.data[pos], nil
 }
 
-//Get all fields as a slice
+//FieldSlice gets all fields as a slice
 func (r *Record) FieldSlice() []interface{} {
 	return r.data
 }
