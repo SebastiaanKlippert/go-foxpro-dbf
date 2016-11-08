@@ -28,7 +28,7 @@ var (
 
 	//ErrInvalidField is returned when an invalid fieldpos is used (<1 or >NumFields)
 	ErrInvalidField = errors.New("Invalid field pos")
-
+ 
 	//ErrNoFPTFile is returned when there should be an FPT file but it is not found on disc
 	ErrNoFPTFile = errors.New("No FPT file")
 
