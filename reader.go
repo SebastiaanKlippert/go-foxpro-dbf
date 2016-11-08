@@ -1,10 +1,11 @@
-// Package dbf provides code for reading data from FoxPro DBF/FPT files
+//Package dbf provides code for reading data from FoxPro DBF/FPT files
 package dbf
 
 import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -13,27 +14,26 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"errors"
 )
 
 var (
 	//ErrEOF is returned when on end of DBF file (after the last record)
-	ErrEOF          = errors.New("EOF")
+	ErrEOF = errors.New("EOF")
 
 	//ErrBOF is returned when the record pointer is attempted to be moved before the first record
-	ErrBOF          = errors.New("BOF")
+	ErrBOF = errors.New("BOF")
 
 	//ErrIncomplete is returned when the read of a record or field did not complete
-	ErrIncomplete   = errors.New("Incomplete read")
+	ErrIncomplete = errors.New("Incomplete read")
 
 	//ErrInvalidField is returned when an invalid fieldpos is used (<1 or >NumFields)
 	ErrInvalidField = errors.New("Invalid field pos")
 
 	//ErrNoFPTFile is returned when there should be an FPT file but it is not found on disc
-	ErrNoFPTFile    = errors.New("No FPT file")
+	ErrNoFPTFile = errors.New("No FPT file")
 
 	//ErrNoDBFFile is returned when a file operation is attempted on a DBF but a reader is open
-	ErrNoDBFFile    = errors.New("No DBF file")
+	ErrNoDBFFile = errors.New("No DBF file")
 )
 
 //ReaderAtSeeker is used when opening files from memory
