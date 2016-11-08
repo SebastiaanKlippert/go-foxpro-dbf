@@ -518,8 +518,8 @@ func (r *Record) FieldSlice() []interface{} {
 	return r.data
 }
 
-//Opens a DBF file (and FPT if needed) from disk.
-//After a successful call to this method (no error is returned) the caller
+//OpenFile opens a DBF file (and FPT if needed) from disk.
+//After a successful call to this method (no error is returned), the caller
 //should call DBF.Close() to close the embedded file handle(s).
 //The Decoder is used for charset translation to UTF8, see decoder.go
 func OpenFile(filename string, dec Decoder) (*DBF, error) {
@@ -563,8 +563,8 @@ func OpenFile(filename string, dec Decoder) (*DBF, error) {
 	return dbf, nil
 }
 
-//Creates a new DBF from a bytes stream, for example a bytes.Reader
-//The fptfile parameter is optional, but if the DBF header contains an FPT flag it must be provided
+//OpenStream creates a new DBF struct from a bytes stream, for example a bytes.Reader
+//The fptfile parameter is optional, but if the DBF header has the FPT flag set, the fptfile must be provided.
 //The Decoder is used for charset translation to UTF8, see decoder.go
 func OpenStream(dbffile, fptfile ReaderAtSeeker, dec Decoder) (*DBF, error) {
 
@@ -670,7 +670,8 @@ func readHeaderFields(r io.ReadSeeker) ([]FieldHeader, error) {
 	return fields, nil
 }
 
-//Memo header. Header info from https://msdn.microsoft.com/en-US/library/8599s21w%28v=vs.80%29.aspx
+//FPTHeader is the raw header of the Memo file.
+//Header info from https://msdn.microsoft.com/en-US/library/8599s21w%28v=vs.80%29.aspx
 type FPTHeader struct {
 	NextFree  uint32  //Location of next free block
 	Unused    [2]byte //Unused
