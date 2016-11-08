@@ -2,7 +2,7 @@
 
 [![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](http://godoc.org/github.com/SebastiaanKlippert/go-foxpro-dbf)
 [![Build Status](https://travis-ci.org/SebastiaanKlippert/go-foxpro-dbf.svg?branch=master)](https://travis-ci.org/SebastiaanKlippert/go-foxpro-dbf)
-
+[![codecov](https://codecov.io/gh/SebastiaanKlippert/go-foxpro-dbf/branch/master/graph/badge.svg)](https://codecov.io/gh/SebastiaanKlippert/go-foxpro-dbf)
 
 Golang package for reading FoxPro DBF/FPT files.
 
