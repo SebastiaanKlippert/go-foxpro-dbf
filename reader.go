@@ -228,9 +228,8 @@ func (dbf *DBF) RecordToJSON(nrec uint32, trimspaces bool) ([]byte, error) {
 	}
 	if trimspaces {
 		for k, v := range m {
-			switch x := v.(type) {
-			case string:
-				m[k] = strings.TrimSpace(x)
+			if str, ok := v.(string); ok {
+				m[k] = strings.TrimSpace(str)
 			}
 		}
 	}
