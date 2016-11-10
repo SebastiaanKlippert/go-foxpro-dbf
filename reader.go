@@ -393,7 +393,7 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 			if len(trimmed) == 0 {
 				return 0, nil
 			}
-			return strconv.ParseInt(trimmed, 10, 32)
+			return strconv.ParseInt(trimmed, 10, 64)
 		}
 		fallthrough //same as "F"
 	case "F":
