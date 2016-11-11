@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/carlosjhr64/jd"
 )
 
 var (
@@ -28,7 +30,7 @@ var (
 
 	//ErrInvalidField is returned when an invalid fieldpos is used (<1 or >NumFields)
 	ErrInvalidField = errors.New("Invalid field pos")
- 
+
 	//ErrNoFPTFile is returned when there should be an FPT file but it is not found on disc
 	ErrNoFPTFile = errors.New("No FPT file")
 
@@ -357,14 +359,11 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 		return nil, fmt.Errorf("Unsupported fieldtype: %s", dbf.fields[fieldpos].FieldType())
 	case "M":
 		//M values contain the address in the FPT file from where to read data
-		memo, isText, err := dbf.readFPT(raw)
-		if err != nil {
-			return "", err
-		}
+		memo, isText, err := dbf.parseMemo(raw)
 		if isText {
-			return dbf.toUTF8String(memo)
+			return string(memo), err
 		}
-		return memo, nil
+		return memo, err
 	case "C":
 		//C values are stored as strings, the returned string is not trimmed
 		return dbf.toUTF8String(raw)
@@ -376,29 +375,31 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 		return math.Float64frombits(binary.LittleEndian.Uint64(raw)), nil
 	case "D":
 		//D values are stored as string in format YYYYMMDD, convert to time.Time
-		if string(raw) == strings.Repeat(" ", 8) {
-			return time.Time{}, nil
-		}
-		return time.Parse("20060102", string(raw))
+		return dbf.parseDate(raw)
+	case "T":
+		//T values are stores as two 4 byte integers
+		// integer one is the date in julian format
+		// integer two is the number of milliseconds since midnight
+		//Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
+		return dbf.parseDateTime(raw)
 	case "L":
 		//L values are stored as strings T or F, we only check for T, the rest is false...
 		return string(raw) == "T", nil
 	case "V":
 		//V values just return the raw value
 		return raw, nil
+	case "Y":
+		//Y values are currency values stored as ints with 4 decimal places
+		return float64(float64(binary.LittleEndian.Uint64(raw)) / 10000), nil
 	case "N":
-		//N values are stored as string values
+		//N values are stored as string values, if no decimals return as int64, if decimals treat as float64
 		if dbf.fields[fieldpos].Decimals == 0 {
-			trimmed := strings.TrimSpace(string(raw))
-			if len(trimmed) == 0 {
-				return 0, nil
-			}
-			return strconv.ParseInt(trimmed, 10, 64)
+			return dbf.parseNumericInt(raw)
 		}
 		fallthrough //same as "F"
 	case "F":
 		//F values are stored as string values
-		return strconv.ParseFloat(strings.TrimSpace(string(raw)), 64)
+		return dbf.parseFloat(raw)
 	}
 }
 
@@ -409,6 +410,55 @@ func (dbf *DBF) toUTF8String(raw []byte) (string, error) {
 		return string(raw), err
 	}
 	return string(utf8), nil
+}
+
+func (dbf *DBF) parseMemo(raw []byte) ([]byte, bool, error) {
+	memo, isText, err := dbf.readFPT(raw)
+	if err != nil {
+		return []byte{}, false, err
+	}
+	if isText {
+		memo, err = dbf.dec.Decode(memo)
+		if err != nil {
+			return []byte{}, false, err
+		}
+	}
+	return memo, isText, nil
+}
+
+func (dbf *DBF) parseDate(raw []byte) (time.Time, error) {
+	if string(raw) == strings.Repeat(" ", 8) {
+		return time.Time{}, nil
+	}
+	return time.Parse("20060102", string(raw))
+}
+
+func (dbf *DBF) parseDateTime(raw []byte) (time.Time, error) {
+	if len(raw) != 8 {
+		return time.Time{}, ErrInvalidField
+	}
+	julDat := int(binary.LittleEndian.Uint32(raw[:4]))
+	mSec := int(binary.LittleEndian.Uint32(raw[4:]))
+	//determine year, month, day
+	y, m, d := jd.J2YMD(julDat)
+	//create time using ymd and nanosecond timestamp
+	return time.Date(y, time.Month(m), d, 0, 0, 0, mSec*int(time.Millisecond), time.UTC), nil
+}
+
+func (dbf *DBF) parseNumericInt(raw []byte) (int64, error) {
+	trimmed := strings.TrimSpace(string(raw))
+	if len(trimmed) == 0 {
+		return int64(0), nil
+	}
+	return strconv.ParseInt(trimmed, 10, 64)
+}
+
+func (dbf *DBF) parseFloat(raw []byte) (float64, error) {
+	trimmed := strings.TrimSpace(string(raw))
+	if len(trimmed) == 0 {
+		return float64(0.0), nil
+	}
+	return strconv.ParseFloat(strings.TrimSpace(string(trimmed)), 64)
 }
 
 //Reads one or more blocks from the FPT file, called for each memo field.

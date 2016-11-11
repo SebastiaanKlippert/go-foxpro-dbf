@@ -6,13 +6,15 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const (
-	TEST_DBF_PATH  = "./testdbf/TEST.DBF"
-	BENCH_DBF_PATH = "./testdbf/TEST.DBF" //For real benchmarks replace this with the path to a large DBF/FPT combo
+	TEST_DBF_PATH  = "./testdbf/"
+	BENCH_DBF_PATH = "./testdbf/" //For real benchmarks replace this with the path to a large DBF/FPT combo
 )
 
 var testDbf *DBF
@@ -44,7 +46,8 @@ func TestMain(m *testing.M) {
 
 func testOpenFile() {
 	var err error
-	testDbf, err = OpenFile(TEST_DBF_PATH, new(Win1250Decoder))
+
+	testDbf, err = OpenFile(filepath.Join(TEST_DBF_PATH, "TEST.DBF"), new(Win1250Decoder))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -52,13 +55,13 @@ func testOpenFile() {
 
 func testOpenStream() {
 
-	dbfbytes, err := ioutil.ReadFile(TEST_DBF_PATH)
+	dbfbytes, err := ioutil.ReadFile(filepath.Join(TEST_DBF_PATH, "TEST.DBF"))
 	if err != nil {
 		log.Fatal(err)
 	}
 	dbfreader := bytes.NewReader(dbfbytes)
 
-	fptbytes, err := ioutil.ReadFile(strings.Replace(TEST_DBF_PATH, ".DBF", ".FPT", 1))
+	fptbytes, err := ioutil.ReadFile(filepath.Join(TEST_DBF_PATH, "TEST.FPT"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -82,7 +85,7 @@ func TestFieldHeader(t *testing.T) {
 //Test if file stat size matches header file size, only run when using file mode
 func TestStatAndFileSize(t *testing.T) {
 	if !usingFile {
-		return
+		t.Skip("Stat and FileSize not testing when using stream")
 	}
 	stat, err := testDbf.Stat()
 	if err != nil {
@@ -287,12 +290,143 @@ func TestClose(t *testing.T) {
 	}
 }
 
+//TestDbase30 runs some test against dbase_30.dbf which has more complex column types
+func TestDbase30(t *testing.T) {
+
+	if !usingFile {
+		t.Skip("TestDbase30 is only tested from disk")
+	}
+
+	dbf, err := OpenFile(filepath.Join(TEST_DBF_PATH, "dbase_30.dbf"), new(Win1250Decoder))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dbf.Close()
+
+	err = dbf.GoTo(13)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec, err := dbf.Record()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fields := rec.FieldSlice()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	//test value and type of caption field
+	caption, ok := fields[5].(string)
+	if !ok {
+		t.Error("caption field should be of type string")
+	}
+	wc := "Joh L. McWilliams & son"
+	if strings.TrimSpace(caption) != wc {
+		t.Errorf("Want caption value %q, have %q", wc, strings.TrimSpace(caption))
+	}
+
+	//test value and type of classes field
+	classes, ok := fields[10].(string)
+	if !ok {
+		t.Error("classes field should be of type string")
+	}
+	wcl := "People\r\nMcWilliams"
+	if strings.TrimSpace(classes) != wcl {
+		t.Errorf("Want classes value %q, have %q", wc, strings.TrimSpace(classes))
+	}
+
+	//test value and type of catdate field
+	catdate, ok := fields[8].(time.Time)
+	if !ok {
+		t.Error("catdate field should be of type time.Time")
+	}
+	wcd := time.Date(2000, 6, 29, 0, 0, 0, 0, time.UTC)
+	if catdate.Equal(wcd) == false {
+		t.Errorf("Want catdate value %v, have %v", wcd, catdate)
+	}
+
+	//test value and type of flagdate field
+	flagdate, ok := fields[38].(time.Time)
+	if !ok {
+		t.Error("flagdate field should be of type time.Time")
+	}
+	wfd := time.Date(1982, 7, 5, 15, 34, 0, 0, time.UTC)
+	if flagdate.Equal(wfd) == false {
+		t.Errorf("Want flagdate value %v, have %v", wfd, flagdate)
+	}
+
+}
+
+//TestDbase31 runs some test against dbase_31.dbf which has more complex column types
+func TestDbase31(t *testing.T) {
+
+	if !usingFile {
+		t.Skip("TestDbase31 is only tested from disk")
+	}
+
+	dbf, err := OpenFile(filepath.Join(TEST_DBF_PATH, "dbase_31.dbf"), new(Win1250Decoder))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dbf.Close()
+
+	err = dbf.GoTo(28)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	//test value and type of PRODUCTNAM field
+	val, err := dbf.Field(dbf.FieldPos("PRODUCTNAM"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	name, ok := val.(string)
+	if !ok {
+		t.Error("PRODUCTNAM field should be of type string")
+	}
+	wn := "Thüringer Rostbratwurst"
+	if strings.TrimSpace(name) != wn {
+		t.Errorf("Want PRODUCTNAM value %q, have %q", wn, strings.TrimSpace(name))
+	}
+
+	//test value and type of CATEGORYID field
+	val, err = dbf.Field(dbf.FieldPos("CATEGORYID"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat, ok := val.(int32)
+	if !ok {
+		t.Error("CATEGORYID field should be of type int32")
+	}
+	wcat := int32(6)
+	if cat != wcat {
+		t.Errorf("Want CATEGORYID value %d, have %d", wcat, cat)
+	}
+
+	//test value and type of UNITPRICE field
+	val, err = dbf.Field(dbf.FieldPos("UNITPRICE"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	price, ok := val.(float64)
+	if !ok {
+		t.Error("UNITPRICE field should be of type float64")
+	}
+	wprice := float64(123.79)
+	if price != wprice {
+		t.Errorf("Want UNITPRICE value %f, have %f", wprice, price)
+	}
+}
+
 //Benchmark for reading all records sequentially
 //Use a large DBF/FPT combo for more realistic results
 func BenchmarkReadRecords(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		err := func() error {
-			dbf, err := OpenFile(BENCH_DBF_PATH, new(Win1250Decoder))
+			dbf, err := OpenFile(filepath.Join(BENCH_DBF_PATH, "dbase_30.dbf"), new(Win1250Decoder))
 			if err != nil {
 				return err
 			}
@@ -314,7 +448,7 @@ func BenchmarkReadRecords(b *testing.B) {
 
 func BenchmarkRecordToJSONWithTrim(b *testing.B) {
 
-	dbf, err := OpenFile(BENCH_DBF_PATH, new(Win1250Decoder))
+	dbf, err := OpenFile(filepath.Join(BENCH_DBF_PATH, "dbase_30.dbf"), new(Win1250Decoder))
 	if err != nil {
 		b.Fatal(err)
 	}

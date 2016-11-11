@@ -8,20 +8,44 @@
 Golang package for reading FoxPro DBF/FPT files.
 
 This package provides a reader for reading FoxPro database files.
-At this moment it is only tested for Alaska XBase++ DBF/FPT files in FoxPro format.
+At this moment it is only tested for Alaska XBase++ DBF/FPT files in FoxPro format and some
+older FoxPro files, see the included `testdbf` folder for these files.
 These files have file flag 0x30 (or 0x31 if autoincrement fields are present).
 
 Since these files are almost always used on Windows platforms the default encoding is
-from Windows-1250 to UTF8 but a universal encoder will be provided for other codepages.
+from Windows-1250 to UTF8 but a universal encoder will be provided for other code pages.
 
 # Features 
 
 There are several similar packages but they are not suited for our use case, this package will try to implement:
 * Support for FPT (memo) files
 * Full support for Windows-1250 encoding to UTF8
-* Filereaders for scanning files (instead of reading the entire file to memory)
+* File readers for scanning files (instead of reading the entire file to memory)
 
 The focus is on performance while also trying to keep the code readable and easy to use.
+
+# Supported field types
+
+At this moment not all FoxPro field types are supported.
+When reading field values, the value returned by this package is always `interface{}`. 
+If you need to cast this to the correct value helper functions are provided.
+
+The supported field types with their return Go types are: 
+
+| Field Type | Field Type Name | Golang type |
+|------------|-----------------|-------------|
+| B | Double | float64 |
+| C | Character | string |
+| D | Date | time.Time |
+| F | Float | float64 |
+| I | Integer | int32 |
+| L | Logical | bool |
+| M | Memo  | string |
+| M | Memo (Binary) | []byte |
+| N | Numeric (0 decimals) | int32 |
+| N | Numeric (with decimals) | float64 |
+| T | DateTime | time.Time |
+| Y | Currency | string |
 
 # Example
 

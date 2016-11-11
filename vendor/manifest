@@ -1,0 +1,13 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/carlosjhr64/jd",
+			"repository": "https://github.com/carlosjhr64/jd",
+			"vcs": "git",
+			"revision": "6d3306d320a915ab8b0c21e5794e0ae4659864a6",
+			"branch": "master",
+			"notests": true
+		}
+	]
+}
