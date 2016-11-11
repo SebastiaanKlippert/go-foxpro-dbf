@@ -2,6 +2,6 @@ language: go
 go:
   - 1.6
   - 1.7
-script: go test -v -coverprofile=coverage.txt -covermode=atomic -bench . ./..
+script: go test -v -coverprofile=coverage.txt -covermode=atomic -bench .
 after_success:
   - bash <(curl -s https://codecov.io/bash)

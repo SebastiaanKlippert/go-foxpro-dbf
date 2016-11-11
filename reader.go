@@ -213,7 +213,7 @@ func (dbf *DBF) RecordToMap(nrec uint32) (map[string]interface{}, error) {
 	for i, fn := range dbf.FieldNames() {
 		val, err := dbf.Field(i)
 		if err != nil {
-			return out, err
+			return out, fmt.Errorf("error on field %s (column %d): %s", fn, i, err)
 		}
 		out[fn] = val
 	}
@@ -441,6 +441,10 @@ func (dbf *DBF) parseDateTime(raw []byte) (time.Time, error) {
 	mSec := int(binary.LittleEndian.Uint32(raw[4:]))
 	//determine year, month, day
 	y, m, d := jd.J2YMD(julDat)
+	if y < 0 || y > 9999 {
+		//TODO some dbf files seem to contain invalid dates, not sure if we want treat this an error until I know what is going on
+		return time.Time{}, nil
+	}
 	//create time using ymd and nanosecond timestamp
 	return time.Date(y, time.Month(m), d, 0, 0, 0, mSec*int(time.Millisecond), time.UTC), nil
 }
