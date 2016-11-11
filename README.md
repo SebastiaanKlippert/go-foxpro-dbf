@@ -45,7 +45,7 @@ The supported field types with their return Go types are:
 | N | Numeric (0 decimals) | int32 |
 | N | Numeric (with decimals) | float64 |
 | T | DateTime | time.Time |
-| Y | Currency | string |
+| Y | Currency | float64 |
 
 # Example
 
