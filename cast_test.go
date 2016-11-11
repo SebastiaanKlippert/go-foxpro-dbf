@@ -10,7 +10,7 @@ func TestToFloat64(t *testing.T) {
 		t.Errorf("Want %f, have %f", float64(123.456), ToFloat64(123.456))
 	}
 	if ToFloat64("123.456") != float64(0) {
-		t.Errorf("Want %f, have %f", 0, ToFloat64(123.456))
+		t.Errorf("Want %f, have %f", 0.0, ToFloat64(123.456))
 	}
 }
 
