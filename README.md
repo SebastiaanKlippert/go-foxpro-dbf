@@ -42,7 +42,7 @@ The supported field types with their return Go types are:
 | L | Logical | bool |
 | M | Memo  | string |
 | M | Memo (Binary) | []byte |
-| N | Numeric (0 decimals) | int32 |
+| N | Numeric (0 decimals) | int64 |
 | N | Numeric (with decimals) | float64 |
 | T | DateTime | time.Time |
 | Y | Currency | float64 |
