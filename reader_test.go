@@ -421,6 +421,68 @@ func TestDbase31(t *testing.T) {
 	}
 }
 
+//TestDkeza runs some test against dkeza.dbf, added in issue #2
+func TestDkeza(t *testing.T) {
+
+	if !usingFile {
+		t.Skip("TestDkeza is only tested from disk")
+	}
+
+	dbf, err := OpenFile(filepath.Join(TEST_DBF_PATH, "dkeza.dbf"), new(UTF8Decoder))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dbf.Close()
+
+	err = dbf.GoTo(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	//test value and type of NUMBER field
+	val, err := dbf.Field(dbf.FieldPos("NUMBER"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	number, ok := val.(int64)
+	if !ok {
+		t.Error("NUMBER field should be of type int64")
+	}
+	wn := int64(8027846523)
+	if number != wn {
+		t.Errorf("Want NUMBER value %d, have %d", wn, number)
+	}
+
+	//test value and type of CURR field
+	val, err = dbf.Field(dbf.FieldPos("CURR"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	curr, ok := val.(float64)
+	if !ok {
+		t.Error("CURR field should be of type float64")
+	}
+	wc := 1234567890.1234
+	if number != wn {
+		t.Errorf("Want CURR value %f, have %f", wc, curr)
+	}
+
+	//test value and type of DTIME field
+	val, err = dbf.Field(dbf.FieldPos("DTIME"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dtime, ok := val.(time.Time)
+	if !ok {
+		t.Error("DTIME field should be of type time.Time")
+	}
+	wdt := time.Date(2016, 11, 14, 9, 10, 44, 0, time.UTC)
+	if dtime.Equal(wdt) == false {
+		t.Errorf("Want DTIME value %s, have %s", wdt, dtime)
+	}
+	t.Logf("DTIME: %s", dtime)
+}
+
 //Benchmark for reading all records sequentially
 //Use a large DBF/FPT combo for more realistic results
 func BenchmarkReadRecords(b *testing.B) {
