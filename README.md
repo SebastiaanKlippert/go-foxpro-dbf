@@ -169,4 +169,4 @@ func TestBytes() error {
 # Thanks
 
 * To [carlosjhr64](https://github.com/carlosjhr64) for the Julian date conversion package <https://github.com/carlosjhr64/jd>
-* To [dkeza](https://github.com/dkeza) for submitting some issues and testing FoxPro files
+* To [dkeza](https://github.com/dkeza) for submitting some issues and testing FoxPro files on 32 bit Go
