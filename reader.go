@@ -445,8 +445,11 @@ func (dbf *DBF) parseDateTime(raw []byte) (time.Time, error) {
 		//TODO some dbf files seem to contain invalid dates, not sure if we want treat this an error until I know what is going on
 		return time.Time{}, nil
 	}
+	//calculate whole seconds and use the remainder as nanosecond resolution
+	nSec := mSec / 1000
+	mSec = mSec - (nSec * 1000)
 	//create time using ymd and nanosecond timestamp
-	return time.Date(y, time.Month(m), d, 0, 0, 0, mSec*int(time.Millisecond), time.UTC), nil
+	return time.Date(y, time.Month(m), d, 0, 0, nSec, mSec*int(time.Millisecond), time.UTC), nil
 }
 
 func (dbf *DBF) parseNumericInt(raw []byte) (int64, error) {
