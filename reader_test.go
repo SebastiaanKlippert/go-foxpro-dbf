@@ -255,16 +255,18 @@ func TestField(t *testing.T) {
 }
 
 func TestRecordToJson(t *testing.T) {
+	//below go 1.8 we want want1, for 1.8 and up we want want12
+	want1 := `{"BOOL":true,"COMP_NAME":"TEST2","COMP_OS":"Windows XP","DATUM":"2015-02-03T00:00:00Z","FLOAT":1.23456789e+08,"ID":2,"ID_NR":6425886,"MELDING":"Tësting wíth éncôdings!","NIVEAU":1,"NUMBER":1.2345678999e+08,"SOORT":12345678,"TIJD":"12:00","USERNR":-600}`
+	want12 := `{"BOOL":true,"COMP_NAME":"TEST2","COMP_OS":"Windows XP","DATUM":"2015-02-03T00:00:00Z","FLOAT":123456789,"ID":2,"ID_NR":6425886,"MELDING":"Tësting wíth éncôdings!","NIVEAU":1,"NUMBER":123456789.99,"SOORT":12345678,"TIJD":"12:00","USERNR":-600}`
 
-	want1 := `{"BOOL":true,"COMP_NAME":"TEST2","COMP_OS":"Windows XP","DATUM":"2015-02-03T00:00:00Z","FLOAT":123456789,"ID":2,"ID_NR":6425886,"MELDING":"Tësting wíth éncôdings!","NIVEAU":1,"NUMBER":123456789.99,"SOORT":12345678,"TIJD":"12:00","USERNR":-600}`
 	want2 := `{"BOOL":true,"COMP_NAME":"                                        ","COMP_OS":"                    ","DATUM":"0001-01-01T00:00:00Z","FLOAT":0,"ID":4,"ID_NR":0,"MELDING":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","NIVEAU":0,"NUMBER":0,"SOORT":0,"TIJD":"        ","USERNR":0}`
 
 	data, err := testDbf.RecordToJSON(1, true)
 	if err != nil {
 		t.Error(err)
 	}
-	if string(data) != want1 {
-		t.Errorf("\nWanted json\n%s\nhave json\n%s\n", want1, string(data))
+	if string(data) != want1 && string(data) != want12 {
+		t.Errorf("\nWanted json\n%s\nor%s\nhave json\n%s\n", want1, want2, string(data))
 	}
 
 	err = testDbf.GoTo(3)
