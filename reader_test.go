@@ -113,9 +113,10 @@ func TestStatAndFileSize(t *testing.T) {
 	if len(testDbf.Fields()) != 13 {
 		t.Errorf("Want 13 fields, have %d", len(testDbf.Fields()))
 	}
+	//Test modified date, because we use time.Local to represent the modified date it can change depending on the system we run
 	modified := testDbf.Header().Modified().UTC()
-	if modified.Format("2006-01-02") != "2015-09-15" {
-		t.Errorf("Want modified data 2015-09-15, have %s", modified.Format("2006-01-02"))
+	if modified.Format("2006-01") != "2015-09" || modified.Day() < 14 || modified.Day() > 16 {
+		t.Errorf("Want modified date between 2015-09-14 and 2015-09-16, have %s", modified.Format("2006-01-02"))
 	}
 }
 
