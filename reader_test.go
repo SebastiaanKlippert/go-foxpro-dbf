@@ -96,6 +96,27 @@ func TestStatAndFileSize(t *testing.T) {
 	if statSize != hdrSize {
 		t.Errorf("Calculated header size: %d, stat size: %d", hdrSize, statSize)
 	}
+	stat, err = testDbf.StatFPT()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fptbytes, err := ioutil.ReadFile(filepath.Join(TEST_DBF_PATH, "TEST.FPT"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if stat.Size() != int64(len(fptbytes)) {
+		t.Errorf("Real FPT size: %d, stat size: %d", len(fptbytes), stat.Size())
+	}
+	if testDbf.NumRecords() != uint32(4) {
+		t.Errorf("Want 4 records, have %d", testDbf.NumRecords())
+	}
+	if len(testDbf.Fields()) != 13 {
+		t.Errorf("Want 13 fields, have %d", len(testDbf.Fields()))
+	}
+	modified := testDbf.Header().Modified().UTC()
+	if modified.Format("2006-01-02") != "2015-09-15" {
+		t.Errorf("Want modified data 2015-09-15, have %s", modified.Format("2006-01-02"))
+	}
 }
 
 //Tests if field headers have been parsed, fails if there are no fields
@@ -261,6 +282,11 @@ func TestRecordToJson(t *testing.T) {
 
 	want2 := `{"BOOL":true,"COMP_NAME":"                                        ","COMP_OS":"                    ","DATUM":"0001-01-01T00:00:00Z","FLOAT":0,"ID":4,"ID_NR":0,"MELDING":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==","NIVEAU":0,"NUMBER":0,"SOORT":0,"TIJD":"        ","USERNR":0}`
 
+	err := testDbf.GoTo(3)
+	if err != nil {
+		t.Error(err)
+	}
+
 	data, err := testDbf.RecordToJSON(1, true)
 	if err != nil {
 		t.Error(err)
@@ -420,6 +446,14 @@ func TestDbase31(t *testing.T) {
 	wprice := float64(123.79)
 	if price != wprice {
 		t.Errorf("Want UNITPRICE value %f, have %f", wprice, price)
+	}
+
+	//Test no FPT errors
+	_, err = dbf.StatFPT()
+	if err == nil {
+		t.Errorf("Want error %s, have no error", ErrNoFPTFile)
+	} else if err != ErrNoFPTFile {
+		t.Errorf("Want error %s, have error %s", ErrNoFPTFile, err)
 	}
 }
 
