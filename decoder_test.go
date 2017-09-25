@@ -17,7 +17,7 @@ func TestUTF8Decoder_Decode(t *testing.T) {
 	}
 }
 
-func TestWin1250Decoder_Decode (t *testing.T) {
+func TestWin1250Decoder_Decode(t *testing.T) {
 	dec := new(Win1250Decoder)
 	in := []byte{0xC4, 0xF5}
 	b, err := dec.Decode(in)
