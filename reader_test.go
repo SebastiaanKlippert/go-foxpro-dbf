@@ -2,6 +2,7 @@ package dbf
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -14,14 +15,14 @@ import (
 
 const (
 	TEST_DBF_PATH  = "./testdbf/"
-	BENCH_DBF_PATH = "./testdbf/" //For real benchmarks replace this with the path to a large DBF/FPT combo
+	BENCH_DBF_PATH = "./testdbf/" // For real benchmarks replace this with the path to a large DBF/FPT combo
 )
 
 var testDbf *DBF
 var usingFile bool
 
-//use testmain to run all the tests twice
-//one time with a file opened from disk and one time with a stream
+// use testmain to run all the tests twice
+// one time with a file opened from disk and one time with a stream
 func TestMain(m *testing.M) {
 
 	fmt.Println("Running tests with file from disk...")
@@ -73,7 +74,7 @@ func testOpenStream() {
 	}
 }
 
-//Quick check if the first field matches
+// Quick check if the first field matches
 func TestFieldHeader(t *testing.T) {
 	want := "{Name:[73 68 0 0 0 0 0 0 0 0 0] Type:73 Pos:1 Len:4 Decimals:0 Flags:0 Next:5 Step:1 Reserved:[0 0 0 0 0 0 0 78]}"
 	have := fmt.Sprintf("%+v", testDbf.fields[0])
@@ -82,7 +83,7 @@ func TestFieldHeader(t *testing.T) {
 	}
 }
 
-//Test if file stat size matches header file size, only run when using file mode
+// Test if file stat size matches header file size, only run when using file mode
 func TestStatAndFileSize(t *testing.T) {
 	if !usingFile {
 		t.Skip("Stat and FileSize not testing when using stream")
@@ -113,21 +114,21 @@ func TestStatAndFileSize(t *testing.T) {
 	if len(testDbf.Fields()) != 13 {
 		t.Errorf("Want 13 fields, have %d", len(testDbf.Fields()))
 	}
-	//Test modified date, because we use time.Local to represent the modified date it can change depending on the system we run
+	// Test modified date, because we use time.Local to represent the modified date it can change depending on the system we run
 	modified := testDbf.Header().Modified().UTC()
 	if modified.Format("2006-01") != "2015-09" || modified.Day() < 14 || modified.Day() > 16 {
 		t.Errorf("Want modified date between 2015-09-14 and 2015-09-16, have %s", modified.Format("2006-01-02"))
 	}
 }
 
-//Tests if field headers have been parsed, fails if there are no fields
+// Tests if field headers have been parsed, fails if there are no fields
 func TestFieldNames(t *testing.T) {
 	fieldnames := testDbf.FieldNames()
 	want := 13
 	if len(fieldnames) != want {
 		t.Errorf("Expected %d fields, have %d", want, len(fieldnames))
 	}
-	//t.Log(fieldnames)
+	// t.Log(fieldnames)
 }
 
 func TestNumFields(t *testing.T) {
@@ -215,15 +216,15 @@ func TestFieldPos(t *testing.T) {
 	}
 }
 
-//Tests a complete record read, reads the second record which is also deleted,
-//also tests getting field values from record object
+// Tests a complete record read, reads the second record which is also deleted,
+// also tests getting field values from record object
 func TestRecord(t *testing.T) {
 	err := testDbf.GoTo(1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	//test if the record is deleted
+	// test if the record is deleted
 	deleted, err := testDbf.Deleted()
 	if err != nil {
 		t.Fatal(err)
@@ -232,7 +233,7 @@ func TestRecord(t *testing.T) {
 		t.Fatal("Record should be deleted")
 	}
 
-	//read the same record using Record() and RecordAt()
+	// read the same record using Record() and RecordAt()
 	recs := [2]*Record{}
 	recs[0], err = testDbf.Record()
 	if err != nil {
@@ -260,7 +261,7 @@ func TestRecord(t *testing.T) {
 	}
 }
 
-//Test reading fields field by field
+// Test reading fields field by field
 func TestField(t *testing.T) {
 	for _, want := range wantValues {
 		val, err := testDbf.Field(want.pos)
@@ -277,7 +278,7 @@ func TestField(t *testing.T) {
 }
 
 func TestRecordToJson(t *testing.T) {
-	//below go 1.8 we want want1, for 1.8 and up we want want12
+	// below go 1.8 we want want1, for 1.8 and up we want want12
 	want1 := `{"BOOL":true,"COMP_NAME":"TEST2","COMP_OS":"Windows XP","DATUM":"2015-02-03T00:00:00Z","FLOAT":1.23456789e+08,"ID":2,"ID_NR":6425886,"MELDING":"Tësting wíth éncôdings!","NIVEAU":1,"NUMBER":1.2345678999e+08,"SOORT":12345678,"TIJD":"12:00","USERNR":-600}`
 	want12 := `{"BOOL":true,"COMP_NAME":"TEST2","COMP_OS":"Windows XP","DATUM":"2015-02-03T00:00:00Z","FLOAT":123456789,"ID":2,"ID_NR":6425886,"MELDING":"Tësting wíth éncôdings!","NIVEAU":1,"NUMBER":123456789.99,"SOORT":12345678,"TIJD":"12:00","USERNR":-600}`
 
@@ -311,7 +312,7 @@ func TestRecordToJson(t *testing.T) {
 
 }
 
-//Close file handles
+// Close file handles
 func TestClose(t *testing.T) {
 	err := testDbf.Close()
 	if err != nil {
@@ -319,7 +320,7 @@ func TestClose(t *testing.T) {
 	}
 }
 
-//TestDbase30 runs some test against dbase_30.dbf which has more complex column types
+// TestDbase30 runs some test against dbase_30.dbf which has more complex column types
 func TestDbase30(t *testing.T) {
 
 	if !usingFile {
@@ -347,7 +348,7 @@ func TestDbase30(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	//test value and type of caption field
+	// test value and type of caption field
 	caption, ok := fields[5].(string)
 	if !ok {
 		t.Error("caption field should be of type string")
@@ -357,7 +358,7 @@ func TestDbase30(t *testing.T) {
 		t.Errorf("Want caption value %q, have %q", wc, strings.TrimSpace(caption))
 	}
 
-	//test value and type of classes field
+	// test value and type of classes field
 	classes, ok := fields[10].(string)
 	if !ok {
 		t.Error("classes field should be of type string")
@@ -367,7 +368,7 @@ func TestDbase30(t *testing.T) {
 		t.Errorf("Want classes value %q, have %q", wc, strings.TrimSpace(classes))
 	}
 
-	//test value and type of catdate field
+	// test value and type of catdate field
 	catdate, ok := fields[8].(time.Time)
 	if !ok {
 		t.Error("catdate field should be of type time.Time")
@@ -377,7 +378,7 @@ func TestDbase30(t *testing.T) {
 		t.Errorf("Want catdate value %v, have %v", wcd, catdate)
 	}
 
-	//test value and type of flagdate field
+	// test value and type of flagdate field
 	flagdate, ok := fields[38].(time.Time)
 	if !ok {
 		t.Error("flagdate field should be of type time.Time")
@@ -389,7 +390,7 @@ func TestDbase30(t *testing.T) {
 
 }
 
-//TestDbase31 runs some test against dbase_31.dbf which has more complex column types
+// TestDbase31 runs some test against dbase_31.dbf which has more complex column types
 func TestDbase31(t *testing.T) {
 
 	if !usingFile {
@@ -407,7 +408,7 @@ func TestDbase31(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	//test value and type of PRODUCTNAM field
+	// test value and type of PRODUCTNAM field
 	val, err := dbf.Field(dbf.FieldPos("PRODUCTNAM"))
 	if err != nil {
 		t.Fatal(err)
@@ -421,7 +422,7 @@ func TestDbase31(t *testing.T) {
 		t.Errorf("Want PRODUCTNAM value %q, have %q", wn, strings.TrimSpace(name))
 	}
 
-	//test value and type of CATEGORYID field
+	// test value and type of CATEGORYID field
 	val, err = dbf.Field(dbf.FieldPos("CATEGORYID"))
 	if err != nil {
 		t.Fatal(err)
@@ -435,7 +436,7 @@ func TestDbase31(t *testing.T) {
 		t.Errorf("Want CATEGORYID value %d, have %d", wcat, cat)
 	}
 
-	//test value and type of UNITPRICE field
+	// test value and type of UNITPRICE field
 	val, err = dbf.Field(dbf.FieldPos("UNITPRICE"))
 	if err != nil {
 		t.Fatal(err)
@@ -449,7 +450,7 @@ func TestDbase31(t *testing.T) {
 		t.Errorf("Want UNITPRICE value %f, have %f", wprice, price)
 	}
 
-	//Test no FPT errors
+	// Test no FPT errors
 	_, err = dbf.StatFPT()
 	if err == nil {
 		t.Errorf("Want error %s, have no error", ErrNoFPTFile)
@@ -458,7 +459,7 @@ func TestDbase31(t *testing.T) {
 	}
 }
 
-//TestDkeza runs some test against dkeza.dbf, added in issue #2
+// TestDkeza runs some test against dkeza.dbf, added in issue #2
 func TestDkeza(t *testing.T) {
 
 	if !usingFile {
@@ -476,7 +477,7 @@ func TestDkeza(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	//test value and type of NUMBER field
+	// test value and type of NUMBER field
 	val, err := dbf.Field(dbf.FieldPos("NUMBER"))
 	if err != nil {
 		t.Fatal(err)
@@ -490,7 +491,7 @@ func TestDkeza(t *testing.T) {
 		t.Errorf("Want NUMBER value %d, have %d", wn, number)
 	}
 
-	//test value and type of CURR field
+	// test value and type of CURR field
 	val, err = dbf.Field(dbf.FieldPos("CURR"))
 	if err != nil {
 		t.Fatal(err)
@@ -504,7 +505,7 @@ func TestDkeza(t *testing.T) {
 		t.Errorf("Want CURR value %f, have %f", wc, curr)
 	}
 
-	//test value and type of DTIME field
+	// test value and type of DTIME field
 	val, err = dbf.Field(dbf.FieldPos("DTIME"))
 	if err != nil {
 		t.Fatal(err)
@@ -520,8 +521,32 @@ func TestDkeza(t *testing.T) {
 	t.Logf("DTIME: %s", dtime)
 }
 
-//Benchmark for reading all records sequentially
-//Use a large DBF/FPT combo for more realistic results
+func TestOpeningUntestedFile(t *testing.T) {
+
+	// open the file without overriding the validation function
+	_, err := OpenFile(filepath.Join(TEST_DBF_PATH, "dbase_03.dbf"), new(Win1250Decoder))
+	if err == nil || strings.HasPrefix(err.Error(), "untested") == false {
+		t.Fatal("expected to have an error when opening untested file dbase_03.dbf")
+	}
+
+	// override function
+	ValidFileVersionFunc = func(version byte) error {
+		if version == 0x03 {
+			return nil
+		}
+		return errors.New("not 0x03")
+	}
+	defer func() { ValidFileVersionFunc = validFileVersion }()
+
+	dbf, err := OpenFile(filepath.Join(TEST_DBF_PATH, "dbase_03.dbf"), new(Win1250Decoder))
+	if err != nil {
+		t.Fatalf("expected no error, have %s:", err)
+	}
+	defer dbf.Close()
+}
+
+// Benchmark for reading all records sequentially
+// Use a large DBF/FPT combo for more realistic results
 func BenchmarkReadRecords(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		err := func() error {

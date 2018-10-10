@@ -51,52 +51,52 @@ The supported field types with their return Go types are:
 
 ```go
 func Test() error {
-	//Open file
+	// Open file
 	testdbf, err := dbf.OpenFile("TEST.DBF", new(dbf.Win1250Decoder))
 	if err != nil {
 		return err
 	}
 	defer testdbf.Close()
 
-	//Print all the fieldnames
+	// Print all the fieldnames
 	for _, name := range testdbf.FieldNames() {
 		fmt.Println(name)
 	}
 
-	//Get fieldinfo for all fields
+	// Get fieldinfo for all fields
 	for _, field := range testdbf.Fields() {
 		fmt.Println(field.FieldName(), field.FieldType(), field.Decimals /*etc*/)
 	}
 
-	//Read the complete second record
+	// Read the complete second record
 	record, err := testdbf.RecordAt(1)
 	if err != nil {
 		return err
 	}
-	//Print all the fields in their Go values
+	// Print all the fields in their Go values
 	fmt.Println(record.FieldSlice())
 
-	//Loop through all records using recordpointer in DBF struct
-	//Reads the complete record
-	for !testdbf.EOF() { //or for i := uint32(0); i < testdbf.NumRecords(); i++ {
+	// Loop through all records using recordpointer in DBF struct
+	// Reads the complete record
+	for !testdbf.EOF() { // or for i := uint32(0); i < testdbf.NumRecords(); i++ {
 
-		//This reads the complete record
+		// This reads the complete record
 		record, err := testdbf.Record()
 		if err != nil {
 			return err
 		}
 		testdbf.Skip(1)
 
-		//skip deleted records
+		// skip deleted records
 		if record.Deleted {
 			continue
 		}
-		//get field by position
+		// get field by position
 		field1, err := record.Field(0)
 		if err != nil {
 			return err
 		}
-		//get field by name
+		// get field by name
 		field2, err := record.Field(testdbf.FieldPos("NAAM"))
 		if err != nil {
 			return err
@@ -105,7 +105,7 @@ func Test() error {
 		fmt.Println(field1, field2)
 	}
 
-	//Read only the third field of records 2, 50 and 300
+	// Read only the third field of records 2, 50 and 300
 	recnumbers := []uint32{2, 50, 300}
 	for _, rec := range recnumbers {
 		err := testdbf.GoTo(rec)
@@ -155,12 +155,12 @@ func TestBytes() error {
 	}
 	defer testdbf.Close()
 
-	//Print all the fieldnames
+	// Print all the fieldnames
 	for _, name := range testdbf.FieldNames() {
 		fmt.Println(name)
 	}
 	
-	//ETC...
+	// ETC...
 	
 	return nil	
 }
