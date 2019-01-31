@@ -202,6 +202,16 @@ func (dbf *DBF) RecordAt(nrec uint32) (*Record, error) {
 	return dbf.bytesToRecord(data)
 }
 
+// ReadHeader reads the head of dbf file
+func (dbf *DBF) ReadHeader() error {
+	header, err := readDBFHeader(dbf.r)
+	if err != nil {
+		return err
+	}
+	dbf.header = header
+	return nil
+}
+
 // RecordToMap returns a complete record as a map.
 // If nrec > 0 it returns the record at nrec, if nrec <= 0 it returns the record at dbf.recpointer
 func (dbf *DBF) RecordToMap(nrec uint32) (map[string]interface{}, error) {
@@ -658,6 +668,7 @@ func OpenStream(dbffile, fptfile ReaderAtSeeker, dec Decoder) (*DBF, error) {
 	return dbf, nil
 }
 
+
 func prepareDBF(dbffile ReaderAtSeeker, dec Decoder) (*DBF, error) {
 
 	header, err := readDBFHeader(dbffile)
@@ -703,7 +714,7 @@ func validFileVersion(version byte) error {
 	switch version {
 	default:
 		return fmt.Errorf("untested DBF file version: %d (%x hex), try overriding ValidFileVersionFunc tp open this file anyway", version, version)
-	case 0x30, 0x31:
+	case 0x3, 0x30, 0x31:
 		return nil
 	}
 }
