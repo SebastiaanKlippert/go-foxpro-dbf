@@ -514,7 +514,7 @@ func (dbf *DBF) readFPT(blockdata []byte) ([]byte, bool, error) {
 }
 
 // DBFHeader is the struct containing all raw DBF header fields.
-// Header info from https:// msdn.microsoft.com/en-us/library/st4a0s68%28VS.80%29.aspx
+// Header info from https://docs.microsoft.com/en-us/previous-versions/visualstudio/foxpro/st4a0s68(v=vs.80)
 type DBFHeader struct {
 	FileVersion byte     // File type flag
 	ModYear     uint8    // Last update year (0-99)
