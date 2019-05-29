@@ -2,12 +2,15 @@ package dbf
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
 	"unicode/utf8"
 
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/transform"
 )
+
+var ErrInvalidUTF8 = errors.New("invalid UTF-8 data")
 
 // The charset decoding is all done in this file so you could use an different decoder
 
@@ -38,4 +41,15 @@ type UTF8Decoder struct{}
 // Decode decodes a UTF8 byte slice to a UTF8 byte slice
 func (d *UTF8Decoder) Decode(in []byte) ([]byte, error) {
 	return in, nil
+}
+
+// UTF8Validator checks if valid UTF8 is read
+type UTF8Validator struct{}
+
+// Decode decodes a UTF8 byte slice to a UTF8 byte slice
+func (d *UTF8Validator) Decode(in []byte) ([]byte, error) {
+	if utf8.Valid(in) {
+		return in, nil
+	}
+	return nil, ErrInvalidUTF8
 }
