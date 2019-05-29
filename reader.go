@@ -383,7 +383,7 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 		// T values are stores as two 4 byte integers
 		//  integer one is the date in julian format
 		//  integer two is the number of milliseconds since midnight
-		// Above info from http:// fox.wikis.com/wc.dll?Wiki~DateTime
+		// Above info from http://fox.wikis.com/wc.dll?Wiki~DateTime
 		return dbf.parseDateTime(raw)
 	case "L":
 		// L values are stored as strings T or F, we only check for T, the rest is false...
@@ -548,7 +548,7 @@ func (h *DBFHeader) FileSize() int64 {
 }
 
 // FieldHeader contains the raw field info structure from the DBF header.
-// Header info from https:// msdn.microsoft.com/en-us/library/st4a0s68%28VS.80%29.aspx
+// Header info from https://docs.microsoft.com/en-us/previous-versions/visualstudio/foxpro/st4a0s68(v=vs.80)
 type FieldHeader struct {
 	Name     [11]byte // Field name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
 	Type     byte     // Field type
@@ -743,7 +743,7 @@ func readHeaderFields(r io.ReadSeeker) ([]FieldHeader, error) {
 }
 
 // FPTHeader is the raw header of the Memo file.
-// Header info from https:// msdn.microsoft.com/en-US/library/8599s21w%28v=vs.80%29.aspx
+// Header info from https://docs.microsoft.com/en-us/previous-versions/visualstudio/foxpro/8599s21w(v=vs.80)
 type FPTHeader struct {
 	NextFree  uint32  // Location of next free block
 	Unused    [2]byte // Unused
