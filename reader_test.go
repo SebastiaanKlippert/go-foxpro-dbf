@@ -521,7 +521,7 @@ func TestDkeza(t *testing.T) {
 	t.Logf("DTIME: %s", dtime)
 }
 
-func TestOpeningUntestedFile(t *testing.T) {
+func TestSetValidFileVersionFunc(t *testing.T) {
 
 	// open the file without overriding the validation function
 	_, err := OpenFile(filepath.Join(TEST_DBF_PATH, "dbase_03.dbf"), new(Win1250Decoder))
@@ -530,17 +530,37 @@ func TestOpeningUntestedFile(t *testing.T) {
 	}
 
 	// override function
-	ValidFileVersionFunc = func(version byte) error {
+	SetValidFileVersionFunc(func(version byte) error {
+		if version == 0x03 {
+			return nil
+		}
+		return errors.New("not 0x03")
+	})
+	defer SetValidFileVersionFunc(validFileVersion)
+
+	dbf, err := OpenFile(filepath.Join(TEST_DBF_PATH, "dbase_03.dbf"), new(Win1250Decoder))
+	if err != nil {
+		t.Fatalf("expected no error, have %s:", err)
+	}
+	defer dbf.Close()
+}
+
+func ExampleSetValidFileVersionFunc() {
+	// create function which checks that only file flag 0x03 is valid
+	validFileVersionFunc := func(version byte) error {
 		if version == 0x03 {
 			return nil
 		}
 		return errors.New("not 0x03")
 	}
-	defer func() { ValidFileVersionFunc = validFileVersion }()
 
-	dbf, err := OpenFile(filepath.Join(TEST_DBF_PATH, "dbase_03.dbf"), new(Win1250Decoder))
+	// set the new function as verifier
+	SetValidFileVersionFunc(validFileVersionFunc)
+
+	// open DBF as usual
+	dbf, err := OpenFile("/var/test.dbf", new(Win1250Decoder))
 	if err != nil {
-		t.Fatalf("expected no error, have %s:", err)
+		log.Fatal(err)
 	}
 	defer dbf.Close()
 }

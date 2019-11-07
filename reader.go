@@ -762,3 +762,9 @@ func readFPTHeader(r io.ReadSeeker) (*FPTHeader, error) {
 	}
 	return h, nil
 }
+
+// SetValidFileVersionFunc sets variable ValidFileVersionFunc to a new function used to verify if the opened
+// file has a valid version flag.
+func SetValidFileVersionFunc(f func(version byte) error) {
+	ValidFileVersionFunc = f
+}
