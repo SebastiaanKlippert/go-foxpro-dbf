@@ -41,6 +41,8 @@ var (
 	ValidFileVersionFunc = validFileVersion
 )
 
+const fieldNullFlags = "_NullFlags"
+
 // ReaderAtSeeker is used when opening files from memory
 type ReaderAtSeeker interface {
 	io.ReadSeeker
@@ -370,7 +372,7 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 	case "C":
 		// C values are stored as strings, the returned string is not trimmed
 		return dbf.toUTF8String(raw)
-	case "I":
+	case "I", "+":
 		// I values are stored as numeric values
 		return int32(binary.LittleEndian.Uint32(raw)), nil
 	case "B":
@@ -389,11 +391,17 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 		// L values are stored as strings T or F, we only check for T, the rest is false...
 		return string(raw) == "T", nil
 	case "V":
-		// V values just return the raw value
-		return raw, nil
+		// V can be VarChar or just raw data, check if there is a _NullFlags field
+		nullFlagsPos := dbf.FieldPos(fieldNullFlags)
+		if nullFlagsPos == -1 {
+			// No flags field found, return raw data
+			return raw, nil
+		}
+		// Treat as varchar field
+		return dbf.parseVarchar(raw, fieldpos, nullFlagsPos)
 	case "Y":
 		// Y values are currency values stored as ints with 4 decimal places
-		return float64(float64(binary.LittleEndian.Uint64(raw)) / 10000), nil
+		return float64(binary.LittleEndian.Uint64(raw)) / 10000, nil
 	case "N":
 		// N values are stored as string values, if no decimals return as int64, if decimals treat as float64
 		if dbf.fields[fieldpos].Decimals == 0 {
@@ -403,6 +411,9 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 	case "F":
 		// F values are stored as string values
 		return dbf.parseFloat(raw)
+	case "0":
+		// flags field, for example _NullFlags, return the raw value
+		return raw, nil
 	}
 }
 
@@ -466,9 +477,51 @@ func (dbf *DBF) parseNumericInt(raw []byte) (int64, error) {
 func (dbf *DBF) parseFloat(raw []byte) (float64, error) {
 	trimmed := strings.TrimSpace(string(raw))
 	if len(trimmed) == 0 {
-		return float64(0.0), nil
+		return 0.0, nil
 	}
 	return strconv.ParseFloat(strings.TrimSpace(string(trimmed)), 64)
+}
+
+// parseVarchar reads varchar data and first reads the data in the _NullFlags field to do so.
+// http://foxcentral.net/microsoft/WhatsNewInVFP9_Chapter09.htm
+func (dbf *DBF) parseVarchar(raw []byte, fieldPos, nullFlagsPos int) (*string, error) {
+	// read the contents of the nullflags field
+	nullFlagsData, err := dbf.Field(nullFlagsPos)
+	if err != nil {
+		return nil, err
+	}
+	nullFlagsBytes := ToBytes(nullFlagsData)
+
+	// count what number of varchar field this field is (for example the second varchar field)
+	varCharCount := 0
+	for i := range dbf.fields {
+		if dbf.fields[i].FieldType() == "V" {
+			varCharCount++
+		}
+		if i >= fieldPos {
+			break
+		}
+	}
+
+	// check if the _NullFlags bit for this field is set
+	if int(nullFlagsBytes[0])&varCharCount > 0 {
+		// bit is set, length is stored in last byte of the field
+		str := string(raw[:int(raw[len(raw)-1])])
+		return &str, nil
+	} else {
+		// bit is not set, length is the field length
+		str := string(raw[:dbf.fields[fieldPos].Len])
+		return &str, nil
+	}
+	// TODO: 2 bits per field:
+	//  a field is both nullable and Varchar or Varbinary, two bits are used to represent a field.
+	//  The lower bit represents the “full” status and the higher bit represents the null status.
+	//  For example, a nullable 10-byte Varchar field containing “AB” is represented by 01 in _NullFlags (0 means not null, 1 means not full-size)
+	//  while a null value in the same field is represented by 11 (null and not full-size).
+
+	// TODO handle null values better
+
+	return nil, nil
 }
 
 // Reads one or more blocks from the FPT file, called for each memo field.

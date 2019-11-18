@@ -54,3 +54,11 @@ func ToBool(in interface{}) bool {
 	}
 	return false
 }
+
+// ToBytes always returns a byte slice
+func ToBytes(in interface{}) []byte {
+	if b, ok := in.([]byte); ok {
+		return b
+	}
+	return []byte{}
+}

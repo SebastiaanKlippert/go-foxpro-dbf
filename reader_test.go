@@ -516,6 +516,45 @@ func TestDkeza(t *testing.T) {
 	t.Logf("DTIME: %s", dtime)
 }
 
+func TestVarChar(t *testing.T) {
+	if !usingFile {
+		t.Skip("TestVarChar is only tested from disk")
+	}
+
+	SetValidFileVersionFunc(func(version byte) error {
+		if version == 0x32 {
+			return nil
+		}
+		return errors.New("invalid file version")
+	})
+	defer SetValidFileVersionFunc(validFileVersion)
+
+	dbf, err := OpenFile(filepath.Join("testdata", "somev.dbf"), new(Win1250Decoder))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dbf.Close()
+
+	err = dbf.GoTo(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := uint32(0); i < dbf.NumRecords(); i++ {
+		m, err := dbf.RecordToMap(i)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for k, v := range m {
+			if s, ok := v.(*string); ok {
+				log.Println(k, *s)
+			} else {
+				log.Println(k, v)
+			}
+		}
+	}
+}
+
 func TestSetValidFileVersionFunc(t *testing.T) {
 
 	// open the file without overriding the validation function

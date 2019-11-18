@@ -1,6 +1,7 @@
 package dbf
 
 import (
+	"bytes"
 	"testing"
 	"time"
 )
@@ -57,5 +58,14 @@ func TestToBool(t *testing.T) {
 	}
 	if ToBool(33) != false {
 		t.Error("Want false")
+	}
+}
+
+func TestToBytes(t *testing.T) {
+	if bytes.Equal(ToBytes([]byte("test")), []byte("test")) == false {
+		t.Errorf("Want %q, have %q", "test", ToBytes([]byte("test")))
+	}
+	if len(ToBytes(33)) != 0 {
+		t.Error("Want empty byte slice")
 	}
 }
