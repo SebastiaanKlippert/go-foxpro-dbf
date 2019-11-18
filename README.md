@@ -34,6 +34,7 @@ The supported field types with their return Go types are:
 
 | Field Type | Field Type Name | Golang type |
 |------------|-----------------|-------------|
+| + | Autoincrement | int32 |
 | B | Double | float64 |
 | C | Character | string |
 | D | Date | time.Time |
@@ -45,6 +46,7 @@ The supported field types with their return Go types are:
 | N | Numeric (0 decimals) | int64 |
 | N | Numeric (with decimals) | float64 |
 | T | DateTime | time.Time |
+| V | Varchar (nullable) | *string |
 | Y | Currency | float64 |
 
 # Example
