@@ -513,7 +513,6 @@ func TestDkeza(t *testing.T) {
 	if dtime.Equal(wdt) == false {
 		t.Errorf("Want DTIME value %s, have %s", wdt, dtime)
 	}
-	t.Logf("DTIME: %s", dtime)
 }
 
 func TestVarChar(t *testing.T) {
@@ -529,7 +528,7 @@ func TestVarChar(t *testing.T) {
 	})
 	defer SetValidFileVersionFunc(validFileVersion)
 
-	dbf, err := OpenFile(filepath.Join("testdata", "somev.dbf"), new(Win1250Decoder))
+	dbf, err := OpenFile(filepath.Join("testdata", "somev.DBF"), new(Win1250Decoder))
 	if err != nil {
 		t.Fatal(err)
 	}
