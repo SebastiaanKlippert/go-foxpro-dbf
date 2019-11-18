@@ -13,11 +13,6 @@ import (
 	"time"
 )
 
-const (
-	TEST_DBF_PATH  = "./testdbf/"
-	BENCH_DBF_PATH = "./testdbf/" // For real benchmarks replace this with the path to a large DBF/FPT combo
-)
-
 var testDbf *DBF
 var usingFile bool
 
@@ -48,7 +43,7 @@ func TestMain(m *testing.M) {
 func testOpenFile() {
 	var err error
 
-	testDbf, err = OpenFile(filepath.Join(TEST_DBF_PATH, "TEST.DBF"), new(Win1250Decoder))
+	testDbf, err = OpenFile(filepath.Join("testdata", "TEST.DBF"), new(Win1250Decoder))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -56,13 +51,13 @@ func testOpenFile() {
 
 func testOpenStream() {
 
-	dbfbytes, err := ioutil.ReadFile(filepath.Join(TEST_DBF_PATH, "TEST.DBF"))
+	dbfbytes, err := ioutil.ReadFile(filepath.Join("testdata", "TEST.DBF"))
 	if err != nil {
 		log.Fatal(err)
 	}
 	dbfreader := bytes.NewReader(dbfbytes)
 
-	fptbytes, err := ioutil.ReadFile(filepath.Join(TEST_DBF_PATH, "TEST.FPT"))
+	fptbytes, err := ioutil.ReadFile(filepath.Join("testdata", "TEST.FPT"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -101,7 +96,7 @@ func TestStatAndFileSize(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fptbytes, err := ioutil.ReadFile(filepath.Join(TEST_DBF_PATH, "TEST.FPT"))
+	fptbytes, err := ioutil.ReadFile(filepath.Join("testdata", "TEST.FPT"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -327,7 +322,7 @@ func TestDbase30(t *testing.T) {
 		t.Skip("TestDbase30 is only tested from disk")
 	}
 
-	dbf, err := OpenFile(filepath.Join(TEST_DBF_PATH, "dbase_30.dbf"), new(Win1250Decoder))
+	dbf, err := OpenFile(filepath.Join("testdata", "dbase_30.dbf"), new(Win1250Decoder))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -397,7 +392,7 @@ func TestDbase31(t *testing.T) {
 		t.Skip("TestDbase31 is only tested from disk")
 	}
 
-	dbf, err := OpenFile(filepath.Join(TEST_DBF_PATH, "dbase_31.dbf"), new(Win1250Decoder))
+	dbf, err := OpenFile(filepath.Join("testdata", "dbase_31.dbf"), new(Win1250Decoder))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -466,7 +461,7 @@ func TestDkeza(t *testing.T) {
 		t.Skip("TestDkeza is only tested from disk")
 	}
 
-	dbf, err := OpenFile(filepath.Join(TEST_DBF_PATH, "dkeza.dbf"), new(UTF8Decoder))
+	dbf, err := OpenFile(filepath.Join("testdata", "dkeza.dbf"), new(UTF8Decoder))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -524,7 +519,7 @@ func TestDkeza(t *testing.T) {
 func TestSetValidFileVersionFunc(t *testing.T) {
 
 	// open the file without overriding the validation function
-	_, err := OpenFile(filepath.Join(TEST_DBF_PATH, "dbase_03.dbf"), new(Win1250Decoder))
+	_, err := OpenFile(filepath.Join("testdata", "dbase_03.dbf"), new(Win1250Decoder))
 	if err == nil || strings.HasPrefix(err.Error(), "untested") == false {
 		t.Fatal("expected to have an error when opening untested file dbase_03.dbf")
 	}
@@ -538,7 +533,7 @@ func TestSetValidFileVersionFunc(t *testing.T) {
 	})
 	defer SetValidFileVersionFunc(validFileVersion)
 
-	dbf, err := OpenFile(filepath.Join(TEST_DBF_PATH, "dbase_03.dbf"), new(Win1250Decoder))
+	dbf, err := OpenFile(filepath.Join("testdata", "dbase_03.dbf"), new(Win1250Decoder))
 	if err != nil {
 		t.Fatalf("expected no error, have %s:", err)
 	}
@@ -570,7 +565,7 @@ func ExampleSetValidFileVersionFunc() {
 func BenchmarkReadRecords(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		err := func() error {
-			dbf, err := OpenFile(filepath.Join(BENCH_DBF_PATH, "dbase_30.dbf"), new(Win1250Decoder))
+			dbf, err := OpenFile(filepath.Join("testdata", "dbase_30.dbf"), new(Win1250Decoder))
 			if err != nil {
 				return err
 			}
@@ -592,7 +587,7 @@ func BenchmarkReadRecords(b *testing.B) {
 
 func BenchmarkRecordToJSONWithTrim(b *testing.B) {
 
-	dbf, err := OpenFile(filepath.Join(BENCH_DBF_PATH, "dbase_30.dbf"), new(Win1250Decoder))
+	dbf, err := OpenFile(filepath.Join("testdata", "dbase_30.dbf"), new(Win1250Decoder))
 	if err != nil {
 		b.Fatal(err)
 	}
