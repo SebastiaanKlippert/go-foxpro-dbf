@@ -547,7 +547,11 @@ func TestVarChar(t *testing.T) {
 		}
 		for k, v := range m {
 			if s, ok := v.(*string); ok {
-				log.Println(k, *s)
+				if s == nil {
+					log.Println(k, "nil")
+				} else {
+					log.Println(k, *s)
+				}
 			} else {
 				log.Println(k, v)
 			}

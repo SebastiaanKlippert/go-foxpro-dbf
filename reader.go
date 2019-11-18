@@ -506,7 +506,12 @@ func (dbf *DBF) parseVarchar(raw []byte, fieldPos, nullFlagsPos int) (*string, e
 	// check if the _NullFlags bit for this field is set
 	if int(nullFlagsBytes[0])&varCharCount > 0 {
 		// bit is set, length is stored in last byte of the field
-		str := string(raw[:int(raw[len(raw)-1])])
+		fieldLen := int(raw[len(raw)-1])
+		if fieldLen == 0 {
+			// len 0 should be treated as null
+			return nil, nil
+		}
+		str := string(raw[:fieldLen])
 		return &str, nil
 	} else {
 		// bit is not set, length is the field length
@@ -518,8 +523,6 @@ func (dbf *DBF) parseVarchar(raw []byte, fieldPos, nullFlagsPos int) (*string, e
 	//  The lower bit represents the “full” status and the higher bit represents the null status.
 	//  For example, a nullable 10-byte Varchar field containing “AB” is represented by 01 in _NullFlags (0 means not null, 1 means not full-size)
 	//  while a null value in the same field is represented by 11 (null and not full-size).
-
-	// TODO handle null values better
 
 	return nil, nil
 }
