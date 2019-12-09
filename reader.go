@@ -19,31 +19,31 @@ import (
 )
 
 var (
-	// ErrEOF is returned when on end of DBF file (after the last record)
+	// ErrEOF is returned when on end of DBF file (after the last record).
 	ErrEOF = errors.New("EOF")
 
-	// ErrBOF is returned when the record pointer is attempted to be moved before the first record
+	// ErrBOF is returned when the record pointer is attempted to be moved before the first record.
 	ErrBOF = errors.New("BOF")
 
-	// ErrIncomplete is returned when the read of a record or field did not complete
+	// ErrIncomplete is returned when the read of a record or field did not complete.
 	ErrIncomplete = errors.New("incomplete read")
 
-	// ErrInvalidField is returned when an invalid fieldpos is used (<1 or >NumFields)
+	// ErrInvalidField is returned when an invalid fieldpos is used (<1 or >NumFields).
 	ErrInvalidField = errors.New("invalid field pos")
 
-	// ErrNoFPTFile is returned when there should be an FPT file but it is not found on disc
+	// ErrNoFPTFile is returned when there should be an FPT file but it is not found on disc.
 	ErrNoFPTFile = errors.New("no FPT file")
 
-	// ErrNoDBFFile is returned when a file operation is attempted on a DBF but a reader is open
+	// ErrNoDBFFile is returned when a file operation is attempted on a DBF but a reader is open.
 	ErrNoDBFFile = errors.New("no DBF file")
 
-	// ValidFileVersionFunc can be used to override file version checks to open untested files
+	// ValidFileVersionFunc can be used to override file version checks to open untested files.
 	ValidFileVersionFunc = validFileVersion
 )
 
 const fieldNullFlags = "_NullFlags"
 
-// ReaderAtSeeker is used when opening files from memory
+// ReaderAtSeeker is used when opening files from memory.
 type ReaderAtSeeker interface {
 	io.ReadSeeker
 	io.ReaderAt
@@ -100,12 +100,12 @@ func (dbf *DBF) prepareFPT(fptfile ReaderAtSeeker) error {
 	return nil
 }
 
-// Header returns the DBF Header struct for inspecting
+// Header returns the DBF Header struct for inspecting.
 func (dbf *DBF) Header() *DBFHeader {
 	return dbf.header
 }
 
-// Stat returns the os.FileInfo for the DBF file
+// Stat returns the os.FileInfo for the DBF file.
 func (dbf *DBF) Stat() (os.FileInfo, error) {
 	if dbf.f == nil {
 		return nil, ErrNoDBFFile
@@ -113,7 +113,7 @@ func (dbf *DBF) Stat() (os.FileInfo, error) {
 	return dbf.f.Stat()
 }
 
-// StatFPT returns the os.FileInfo for the FPT file
+// StatFPT returns the os.FileInfo for the FPT file.
 func (dbf *DBF) StatFPT() (os.FileInfo, error) {
 	if dbf.fptf == nil {
 		return nil, ErrNoFPTFile
@@ -121,27 +121,35 @@ func (dbf *DBF) StatFPT() (os.FileInfo, error) {
 	return dbf.fptf.Stat()
 }
 
-// NumRecords returns the number of records
+// NumRecords returns the number of records.
 func (dbf *DBF) NumRecords() uint32 {
 	return dbf.header.NumRec
 }
 
-// Fields returns all the FieldHeaders
+// Fields returns all the FieldHeaders.
 func (dbf *DBF) Fields() []FieldHeader {
 	return dbf.fields
 }
 
-// NumFields returns the number of fields
+// NumFields returns the number of fields, excluding system columns.
 func (dbf *DBF) NumFields() uint16 {
-	return uint16(len(dbf.fields))
+	count := uint16(0)
+	for _, f := range dbf.fields {
+		if f.IsSystem() == false {
+			count++
+		}
+	}
+	return count
 }
 
-// FieldNames returnes a slice of all the fieldnames
+// FieldNames returnes a slice of all the fieldnames, excluding system columns.
 func (dbf *DBF) FieldNames() []string {
-	num := len(dbf.fields)
-	names := make([]string, num)
-	for i := 0; i < num; i++ {
-		names[i] = dbf.fields[i].FieldName()
+	var names []string
+	for _, f := range dbf.fields {
+		if f.IsSystem() {
+			continue
+		}
+		names = append(names, f.FieldName())
 	}
 	return names
 }
@@ -195,7 +203,7 @@ func (dbf *DBF) Record() (*Record, error) {
 	return dbf.bytesToRecord(data)
 }
 
-// RecordAt reads the complete record number nrec
+// RecordAt reads the complete record number nrec.
 func (dbf *DBF) RecordAt(nrec uint32) (*Record, error) {
 	data, err := dbf.readRecord(nrec)
 	if err != nil {
@@ -205,7 +213,7 @@ func (dbf *DBF) RecordAt(nrec uint32) (*Record, error) {
 }
 
 // RecordToMap returns a complete record as a map.
-// If nrec > 0 it returns the record at nrec, if nrec <= 0 it returns the record at dbf.recpointer
+// If nrec > 0 it returns the record at nrec, if nrec <= 0 it returns the record at dbf.recpointer.
 func (dbf *DBF) RecordToMap(nrec uint32) (map[string]interface{}, error) {
 	if nrec <= 0 {
 		nrec = dbf.recpointer
@@ -315,9 +323,90 @@ func (dbf *DBF) DeletedAt(recordpos uint32) (bool, error) {
 	return buf[0] == 0x2A, nil
 }
 
-// Deleted returns if the record at the internal record pos is deleted
+// Deleted returns if the record at the internal record pos is deleted.
 func (dbf *DBF) Deleted() (bool, error) {
 	return dbf.DeletedAt(dbf.recpointer)
+}
+
+// nullFlags reads the contents of the _NullFlags field for the current record.
+func (dbf *DBF) nullFlags() ([]byte, error) {
+	nullFlagsPos := dbf.FieldPos(fieldNullFlags)
+	if nullFlagsPos == 0 {
+		return []byte{}, nil
+	}
+	nullFlagsData, err := dbf.Field(nullFlagsPos)
+	if err != nil {
+		return nil, err
+	}
+	return ToBytes(nullFlagsData), nil
+}
+
+// nullFlagsOffset returns the bit position to start reading at for field fieldpos.
+func (dbf *DBF) nullFlagsOffset(fieldpos int) int {
+	// range over all fields until we reach the field we want, fieldpos is 0 based
+	offset := 0
+	for i := 0; i < fieldpos; i++ {
+		if i >= len(dbf.fields) {
+			break
+		}
+		// add position if field is nullable
+		if dbf.fields[i].IsNullable() {
+			offset++
+		}
+		// add position if field is VarChar or VarBinary
+		if dbf.fields[i].FieldType() == "V" || dbf.fields[i].FieldType() == "Q" {
+			offset++
+		}
+	}
+	return offset
+}
+
+// FieldIsNull returns if field fieldpos at the internal record pointer contains a NULL value.
+func (dbf *DBF) FieldIsNull(fieldpos int) (bool, error) {
+	if fieldpos >= len(dbf.fields) {
+		return false, ErrInvalidField
+	}
+	// check if field is nullable
+	if dbf.fields[fieldpos].IsNullable() == false {
+		return false, nil
+	}
+	// field is nullable, read the nullflags field data
+	nullFlagsData, err := dbf.nullFlags()
+	if err != nil {
+		return false, err
+	}
+	if len(nullFlagsData) == 0 {
+		return false, nil
+	}
+
+	// determine where to look
+	// - for VarChar and VarBinary fields the null bit is stored in the _NullFlags field
+	// - for all other fields check the full flag
+	offset := dbf.nullFlagsOffset(fieldpos)
+	if dbf.fields[fieldpos].FieldType() == "V" || dbf.fields[fieldpos].FieldType() == "Q" {
+		offset++
+	}
+
+	// determine byte and bit position from offset
+	byteNum := offset / 9
+	bitPos := offset - (8 * byteNum)
+	bit := 1 << uint(bitPos)
+
+	if int(nullFlagsData[byteNum])&bit > 0 {
+		// bit is set, length is stored in last byte of the field, read raw field data
+		raw, err := dbf.readField(dbf.recpointer, fieldpos)
+		if err != nil {
+			return false, err
+		}
+		fieldLen := int(raw[len(raw)-1])
+		if fieldLen == 0 {
+			// len 0 should be treated as null
+			return true, nil
+		}
+		return false, nil
+	}
+	// bit is not set, length is the field length so definately not a NULL value
+	return false, nil
 }
 
 // Converts raw recorddata to a Record struct.
@@ -373,7 +462,7 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 		// C values are stored as strings, the returned string is not trimmed
 		return dbf.toUTF8String(raw)
 	case "I", "+":
-		// I values are stored as numeric values
+		// I values are stored as numeric int32 values
 		return int32(binary.LittleEndian.Uint32(raw)), nil
 	case "B":
 		// B (double) values are stored as numeric values
@@ -398,7 +487,11 @@ func (dbf *DBF) fieldDataToValue(raw []byte, fieldpos int) (interface{}, error) 
 			return raw, nil
 		}
 		// Treat as varchar field
-		return dbf.parseVarchar(raw, fieldpos, nullFlagsPos)
+		return dbf.parseVarchar(raw, fieldpos)
+	case "Q":
+		// Q is VarBinary but is not supported yet
+		// TODO add support for VarBinary format
+		return nil, fmt.Errorf("VarBinary support is not implemented yet")
 	case "Y":
 		// Y values are currency values stored as ints with 4 decimal places
 		return float64(binary.LittleEndian.Uint64(raw)) / 10000, nil
@@ -484,47 +577,43 @@ func (dbf *DBF) parseFloat(raw []byte) (float64, error) {
 
 // parseVarchar reads varchar data and first reads the data in the _NullFlags field to do so.
 // http://foxcentral.net/microsoft/WhatsNewInVFP9_Chapter09.htm
-func (dbf *DBF) parseVarchar(raw []byte, fieldPos, nullFlagsPos int) (*string, error) {
-	// read the contents of the nullflags field
-	nullFlagsData, err := dbf.Field(nullFlagsPos)
+func (dbf *DBF) parseVarchar(raw []byte, fieldPos int) (*string, error) {
+	isNull, err := dbf.FieldIsNull(fieldPos)
 	if err != nil {
 		return nil, err
 	}
-	nullFlagsBytes := ToBytes(nullFlagsData)
-
-	// count what number of varchar field this field is (for example the second varchar field)
-	varCharCount := 0
-	for i := range dbf.fields {
-		if dbf.fields[i].FieldType() == "V" {
-			varCharCount++
-		}
-		if i >= fieldPos {
-			break
-		}
+	if isNull {
+		return nil, nil
 	}
 
-	// check if the _NullFlags bit for this field is set
-	if int(nullFlagsBytes[0])&varCharCount > 0 {
+	// field is nullable, read the nullflags field data
+	nullFlagsData, err := dbf.nullFlags()
+	if err != nil {
+		return nil, err
+	}
+	if len(nullFlagsData) == 0 {
+		return nil, ErrIncomplete
+	}
+
+	// determine where to look
+	// for VarChar and VarBinary fields the null bit is stored in the _NullFlags field
+	offset := dbf.nullFlagsOffset(fieldPos)
+
+	// determine byte and bit position from offset
+	byteNum := offset / 9
+	bitPos := offset - (8 * byteNum)
+	bit := 1 << uint(bitPos)
+
+	if int(nullFlagsData[byteNum])&bit > 0 {
 		// bit is set, length is stored in last byte of the field
 		fieldLen := int(raw[len(raw)-1])
-		if fieldLen == 0 {
-			// len 0 should be treated as null
-			return nil, nil
-		}
 		str := string(raw[:fieldLen])
 		return &str, nil
-	} else {
-		// bit is not set, length is the field length
-		str := string(raw[:dbf.fields[fieldPos].Len])
-		return &str, nil
 	}
-	// TODO: 2 bits per field:
-	//  a field is both nullable and Varchar or Varbinary, two bits are used to represent a field.
-	//  The lower bit represents the “full” status and the higher bit represents the null status.
-	//  For example, a nullable 10-byte Varchar field containing “AB” is represented by 01 in _NullFlags (0 means not null, 1 means not full-size)
-	//  while a null value in the same field is represented by 11 (null and not full-size).
 
-	return nil, nil
+	// bit is not set, length is the field length
+	str := string(raw[:dbf.fields[fieldPos].Len])
+	return &str, nil
 }
 
 // Reads one or more blocks from the FPT file, called for each memo field.
@@ -604,7 +693,7 @@ func (h *DBFHeader) FileSize() int64 {
 }
 
 // FieldHeader contains the raw field info structure from the DBF header.
-// Header info from https://docs.microsoft.com/en-us/previous-versions/visualstudio/foxpro/st4a0s68(v=vs.80)
+// Header info from https://docs.microsoft.com/en-us/previous-versions/visualstudio/foxpro/st4a0s68(v=vs.80).
 type FieldHeader struct {
 	Name     [11]byte // Field name with a maximum of 10 characters. If less than 10, it is padded with null characters (0x00).
 	Type     byte     // Field type
@@ -617,23 +706,33 @@ type FieldHeader struct {
 	Reserved [8]byte  // Reserved
 }
 
-// FieldName returns the name of the field as a trimmed string (max length 10)
+// FieldName returns the name of the field as a trimmed string (max length 10).
 func (f *FieldHeader) FieldName() string {
 	return string(bytes.TrimRight(f.Name[:], "\x00"))
 }
 
-// FieldType returns the type of the field as string (length 1)
+// FieldType returns the type of the field as string (length 1).
 func (f *FieldHeader) FieldType() string {
 	return string(f.Type)
 }
 
-// Record contains the raw record data and a deleted flag
+// IsSystem returns if the field is a hidden system colomn like _NullFlags (bit 1 in field flags is set).
+func (f *FieldHeader) IsSystem() bool {
+	return f.Flags&1 > 0
+}
+
+// IsNullable returns if the field can contain NULL values (bit 2 in field flags is set).
+func (f *FieldHeader) IsNullable() bool {
+	return f.Flags&2 > 0
+}
+
+// Record contains the raw record data and a deleted flag.
 type Record struct {
 	Deleted bool
 	data    []interface{}
 }
 
-// Field gets a fields value by field pos (index)
+// Field gets a fields value by field pos (index).
 func (r *Record) Field(pos int) (interface{}, error) {
 	if pos < 0 || len(r.data) < pos {
 		return 0, ErrInvalidField
@@ -641,7 +740,7 @@ func (r *Record) Field(pos int) (interface{}, error) {
 	return r.data[pos], nil
 }
 
-// FieldSlice gets all fields as a slice
+// FieldSlice gets all fields as a slice.
 func (r *Record) FieldSlice() []interface{} {
 	return r.data
 }
@@ -666,9 +765,9 @@ func OpenFile(filename string, dec Decoder) (*DBF, error) {
 
 	dbf.f = dbffile
 
-	// Check if there is an FPT according to the header
-	// If there is we will try to open it in the same dir (using the same filename and case)
-	// If the FPT file does not exist an error is returned
+	// Check if there is an FPT according to the header.
+	// If there is we will try to open it in the same dir (using the same filename and case).
+	// If the FPT file does not exist an error is returned.
 	if (dbf.header.TableFlags & 0x02) != 0 {
 		ext := filepath.Ext(filename)
 		fptext := ".fpt"
@@ -691,9 +790,9 @@ func OpenFile(filename string, dec Decoder) (*DBF, error) {
 	return dbf, nil
 }
 
-// OpenStream creates a new DBF struct from a bytes stream, for example a bytes.Reader
+// OpenStream creates a new DBF struct from a bytes stream, for example a bytes.Reader.
 // The fptfile parameter is optional, but if the DBF header has the FPT flag set, the fptfile must be provided.
-// The Decoder is used for charset translation to UTF8, see decoder.go
+// The Decoder is used for charset translation to UTF8, see decoder.go.
 func OpenStream(dbffile, fptfile ReaderAtSeeker, dec Decoder) (*DBF, error) {
 
 	dbf, err := prepareDBF(dbffile, dec)

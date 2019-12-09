@@ -383,6 +383,13 @@ func TestDbase30(t *testing.T) {
 		t.Errorf("Want flagdate value %v, have %v", wfd, flagdate)
 	}
 
+	// all fields are not nullable
+	for i := uint16(0); i < dbf.NumFields(); i++ {
+		if dbf.Fields()[i].IsNullable() {
+			t.Errorf("field %d is nullable, but should not be", i)
+		}
+	}
+
 }
 
 // TestDbase31 runs some test against dbase_31.dbf which has more complex column types
@@ -539,6 +546,10 @@ func TestVarChar(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	for i := uint16(0); i < dbf.NumFields(); i++ {
+		fmt.Println(dbf.Fields()[i].IsNullable())
+	}
+
 	for i := uint32(0); i < dbf.NumRecords(); i++ {
 		m, err := dbf.RecordToMap(i)
 		if err != nil {
@@ -554,6 +565,120 @@ func TestVarChar(t *testing.T) {
 			} else {
 				log.Println(k, v)
 			}
+		}
+	}
+}
+
+func TestVarChar2(t *testing.T) {
+	if !usingFile {
+		t.Skip("TestVarChar is only tested from disk")
+	}
+
+	SetValidFileVersionFunc(func(version byte) error {
+		if version == 0x32 {
+			return nil
+		}
+		return errors.New("invalid file version")
+	})
+	defer SetValidFileVersionFunc(validFileVersion)
+
+	dbf, err := OpenFile(filepath.Join("testdata", "somev2.DBF"), new(Win1250Decoder))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dbf.Close()
+
+	err = dbf.GoTo(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// field CLASTNAME is nallable, the orhers are not
+	if dbf.Fields()[dbf.FieldPos("CLASTNAME")].IsNullable() == false {
+		t.Errorf("Field CLASTNAME should be nullable")
+	}
+	if dbf.Fields()[dbf.FieldPos("CNAME")].IsNullable() == true {
+		t.Errorf("Field CNAME should not be nullable")
+	}
+	if dbf.Fields()[dbf.FieldPos("ID")].IsNullable() == true {
+		t.Errorf("Field ID should not be nullable")
+	}
+
+	strp := func(s string) *string {
+		return &s
+	}
+	strv := func(s *string) string {
+		if s == nil {
+			return ""
+		}
+		return *s
+	}
+
+	recordData := []struct {
+		record    uint32
+		id        int32
+		cname     string
+		clastname *string
+	}{
+		{
+			record:    0,
+			id:        1,
+			cname:     "Monk",
+			clastname: nil,
+		},
+		{
+			record:    1,
+			id:        2,
+			cname:     "Marvin",
+			clastname: strp(""),
+		},
+		{
+			record:    2,
+			id:        3,
+			cname:     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+			clastname: strp("Derps"),
+		},
+	}
+
+	for _, data := range recordData {
+		if err := dbf.GoTo(data.record); err != nil {
+			t.Fatal(err)
+		}
+
+		// check if field is null and if it should be
+		isNull, err := dbf.FieldIsNull(dbf.FieldPos("CLASTNAME"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if isNull != (data.clastname == nil) {
+			t.Errorf("record %d: field CLASTNAME isNull is %t", data.record, isNull)
+		}
+
+		// check value of all fields
+		m, err := dbf.RecordToMap(0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id := ToInt32(m["ID"])
+		cname := ToStringPointer(m["CNAME"])
+		clastname := ToStringPointer(m["CLASTNAME"])
+
+		//log.Println(id, strv(cname), strv(clastname))
+
+		if id != data.id {
+			t.Errorf("record %d: want ID %d, have %d", data.record, data.id, id)
+		}
+		if strv(cname) != data.cname {
+			t.Errorf("record %d: want CNAME %q, have %q", data.record, data.cname, strv(cname))
+		}
+		if data.clastname == nil && clastname != nil {
+			t.Errorf("record %d: want CLASTNAME to be nil, have %q", data.record, *clastname)
+		}
+		if data.clastname != nil && clastname == nil {
+			t.Errorf("record %d: want CLASTNAME to be %q, have nil", data.record, *data.clastname)
+		}
+		if strv(clastname) != strv(data.clastname) {
+			t.Errorf("record %d: want CLASTNAME %q, have %q", data.record, strv(data.clastname), strv(clastname))
 		}
 	}
 }

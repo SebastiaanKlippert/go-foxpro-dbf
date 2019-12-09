@@ -24,12 +24,32 @@ func TestToInt64(t *testing.T) {
 	}
 }
 
+func TestToInt32(t *testing.T) {
+	if ToInt32(int32(123456)) != int32(123456) {
+		t.Errorf("Want %d, have %d", int32(123456), ToInt32(123456))
+	}
+	if ToInt32("123.456") != int32(0) {
+		t.Errorf("Want %d, have %d", 0, ToInt32(123456))
+	}
+}
+
 func TestToString(t *testing.T) {
 	if ToString("Hêllo!") != "Hêllo!" {
 		t.Errorf("Want %q, have %q", "Hêllo!", ToString("Hêllo!"))
 	}
 	if ToString(123.456) != "" {
 		t.Errorf("Want %q, have %q", "", ToString(123.456))
+	}
+}
+
+func TestToStringPointer(t *testing.T) {
+	s := "Hêllo!"
+	p := ToStringPointer(&s)
+	if *p != s {
+		t.Errorf("Want %q, have %q", s, *p)
+	}
+	if ToStringPointer(123) != nil {
+		t.Errorf("Want nil, have %v", ToStringPointer(123))
 	}
 }
 

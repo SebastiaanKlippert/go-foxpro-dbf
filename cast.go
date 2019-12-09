@@ -15,6 +15,14 @@ func ToString(in interface{}) string {
 	return ""
 }
 
+// ToStringPointer always returns a string pointer
+func ToStringPointer(in interface{}) *string {
+	if str, ok := in.(*string); ok {
+		return str
+	}
+	return nil
+}
+
 // ToTrimmedString always returns a string with spaces trimmed
 func ToTrimmedString(in interface{}) string {
 	if str, ok := in.(string); ok {
@@ -26,6 +34,14 @@ func ToTrimmedString(in interface{}) string {
 // ToInt64 always returns an int64
 func ToInt64(in interface{}) int64 {
 	if i, ok := in.(int64); ok {
+		return i
+	}
+	return 0
+}
+
+// ToInt32 always returns an int32
+func ToInt32(in interface{}) int32 {
+	if i, ok := in.(int32); ok {
 		return i
 	}
 	return 0
