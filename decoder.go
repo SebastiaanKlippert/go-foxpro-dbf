@@ -22,12 +22,28 @@ type Decoder interface {
 // Win1250Decoder translates a Windows-1250 DBF to UTF8
 type Win1250Decoder struct{}
 
+// CP866 translates a Windows-CP866 DBF to UTF8
+type CodePage866 struct{}
+
 // Decode decodes a Windows1250 byte slice to a UTF8 byte slice
 func (d *Win1250Decoder) Decode(in []byte) ([]byte, error) {
 	if utf8.Valid(in) {
 		return in, nil
 	}
 	r := transform.NewReader(bytes.NewReader(in), charmap.Windows1250.NewDecoder())
+	data, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// Decode decodes a CP866 byte slice to a UTF8 byte slice
+func (d *CodePage866) Decode(in []byte) ([]byte, error) {
+	if utf8.Valid(in) {
+		return in, nil
+	}
+	r := transform.NewReader(bytes.NewReader(in), charmap.CodePage866.NewDecoder())
 	data, err := ioutil.ReadAll(r)
 	if err != nil {
 		return nil, err
