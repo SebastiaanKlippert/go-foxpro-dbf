@@ -1,7 +1,7 @@
 # go-foxpro-dbf
 
 [![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](http://godoc.org/github.com/SebastiaanKlippert/go-foxpro-dbf)
-[![Build Status](https://travis-ci.org/SebastiaanKlippert/go-foxpro-dbf.svg?branch=master)](https://travis-ci.org/SebastiaanKlippert/go-foxpro-dbf)
+[![Build & test](https://github.com/SebastiaanKlippert/go-foxpro-dbf/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/SebastiaanKlippert/go-foxpro-dbf/actions/workflows/ubuntu.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/SebastiaanKlippert/go-foxpro-dbf)](https://goreportcard.com/report/github.com/SebastiaanKlippert/go-foxpro-dbf)
 [![codecov](https://codecov.io/gh/SebastiaanKlippert/go-foxpro-dbf/branch/master/graph/badge.svg)](https://codecov.io/gh/SebastiaanKlippert/go-foxpro-dbf)
 
