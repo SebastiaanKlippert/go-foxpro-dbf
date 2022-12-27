@@ -1,4 +1,4 @@
-module github.com/SebastiaanKlippert/go-foxpro-dbf
+module github.com/froodo/go-foxpro-dbf
 
 go 1.12
 
