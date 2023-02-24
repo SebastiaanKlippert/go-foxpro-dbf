@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/carlosjhr64/jd"
+	"github.com/SebastiaanKlippert/go-foxpro-dbf/jd"
 )
 
 var (

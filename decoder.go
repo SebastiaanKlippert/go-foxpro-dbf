@@ -3,7 +3,7 @@ package dbf
 import (
 	"bytes"
 	"errors"
-	"io/ioutil"
+	"io"
 	"unicode/utf8"
 
 	"golang.org/x/text/encoding/charmap"
@@ -12,7 +12,7 @@ import (
 
 var ErrInvalidUTF8 = errors.New("invalid UTF-8 data")
 
-// The charset decoding is all done in this file so you could use an different decoder
+// The charset decoding is all done in this file so you could use a different decoder
 
 // Decoder is the interface as passed to OpenFile
 type Decoder interface {
@@ -28,7 +28,7 @@ func (d *Win1250Decoder) Decode(in []byte) ([]byte, error) {
 		return in, nil
 	}
 	r := transform.NewReader(bytes.NewReader(in), charmap.Windows1250.NewDecoder())
-	data, err := ioutil.ReadAll(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
